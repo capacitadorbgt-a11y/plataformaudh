@@ -11,11 +11,18 @@ export default async function NuevoSeguimientoPage({
   await requireUser();
   const supabase = createClient();
 
-  const { data: escuelas } = await supabase
-    .from("escuelas")
-    .select("id, nombre")
-    .order("nombre")
-    .returns<Pick<Escuela, "id" | "nombre">[]>();
+  const [{ data: escuelas }, { data: pdvs }] = await Promise.all([
+    supabase
+      .from("escuelas")
+      .select("id, nombre")
+      .order("nombre")
+      .returns<Pick<Escuela, "id" | "nombre">[]>(),
+    supabase
+      .from("pdvs")
+      .select("id, nombre")
+      .order("nombre")
+      .returns<{ id: string; nombre: string }[]>(),
+  ]);
 
   return (
     <div className="max-w-2xl mx-auto space-y-4">
@@ -60,8 +67,18 @@ export default async function NuevoSeguimientoPage({
           </div>
           <div>
             <label className="label">PDV solicitud</label>
-            <input className="input" name="pdv_solicitud" />
+            <select className="input" name="pdv_solicitud_select" defaultValue="">
+              <option value="">— Selecciona un PDV —</option>
+              {pdvs?.map((p) => (
+                <option key={p.id} value={p.nombre}>{p.nombre}</option>
+              ))}
+            </select>
           </div>
+        </div>
+
+        <div>
+          <label className="label">PDV solicitud (si no está en la lista)</label>
+          <input className="input" name="pdv_solicitud_libre" placeholder="Escribe el nombre del PDV" />
         </div>
 
         <div className="grid sm:grid-cols-2 gap-4">

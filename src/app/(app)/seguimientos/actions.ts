@@ -19,6 +19,9 @@ export async function createSeguimiento(formData: FormData) {
   const supabase = createClient();
 
   const escuelaId = toNullableStr(formData.get("escuela_id"));
+  const pdvSolicitud =
+    toNullableStr(formData.get("pdv_solicitud_libre")) ??
+    toNullableStr(formData.get("pdv_solicitud_select"));
   const aspirantesRaw = String(formData.get("aspirantes") || "");
   const aspirantes = aspirantesRaw
     .split("\n")
@@ -33,7 +36,7 @@ export async function createSeguimiento(formData: FormData) {
     num_aspirantes: aspirantes.length || toNullableInt(formData.get("num_aspirantes")),
     aspirantes,
     cargo: toNullableStr(formData.get("cargo")),
-    pdv_solicitud: toNullableStr(formData.get("pdv_solicitud")),
+    pdv_solicitud: pdvSolicitud,
     fecha_ingreso: toNullableStr(formData.get("fecha_ingreso")),
     aspirante_aprobado: toNullableStr(formData.get("aspirante_aprobado")),
     observaciones: toNullableStr(formData.get("observaciones")),
