@@ -32,12 +32,15 @@ export async function requireAdmin() {
   return { user, profile };
 }
 
-export function tienePermiso(profile: Profile, herramienta: "escuelas" | "seguimientos" | "entregas") {
+export function tienePermiso(
+  profile: Profile,
+  herramienta: "escuelas" | "seguimientos" | "entregas" | "encuestas"
+) {
   if (profile.role === "admin_udh") return true;
   return profile.permisos?.[herramienta] !== false;
 }
 
-export async function requirePermiso(herramienta: "escuelas" | "seguimientos" | "entregas") {
+export async function requirePermiso(herramienta: "escuelas" | "seguimientos" | "entregas" | "encuestas") {
   const { user, profile } = await requireUser();
   if (!tienePermiso(profile, herramienta)) redirect("/");
   return { user, profile };

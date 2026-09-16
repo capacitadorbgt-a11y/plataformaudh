@@ -72,6 +72,10 @@ export default function UsuarioRow({
             <input type="checkbox" name="permiso_entregas" defaultChecked={usuario.permisos?.entregas !== false} />
             Recompensas y material
           </label>
+          <label className="flex items-center gap-2 text-xs">
+            <input type="checkbox" name="permiso_encuestas" defaultChecked={usuario.permisos?.encuestas !== false} />
+            Encuestas
+          </label>
           <button type="submit" disabled={permisos.isPending} className="btn-secondary text-xs mt-1 disabled:opacity-50">
             {permisos.isPending ? "Guardando..." : "Guardar permisos"}
           </button>

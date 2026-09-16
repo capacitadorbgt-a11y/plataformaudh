@@ -15,6 +15,9 @@ export default function Navbar({ profile }: { profile: Profile }) {
   if (esAdmin || profile.permisos?.entregas !== false) {
     links.push({ href: "/entregas", label: "Recompensas y material" });
   }
+  if (esAdmin || profile.permisos?.encuestas !== false) {
+    links.push({ href: "/encuestas", label: "Encuestas" });
+  }
   if (esAdmin) {
     links.push({ href: "/usuarios", label: "Usuarios" });
     links.push({ href: "/auditoria", label: "Auditoría" });

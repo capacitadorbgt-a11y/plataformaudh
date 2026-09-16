@@ -111,6 +111,7 @@ export async function updateUsuarioPermisos(userId: string, formData: FormData) 
     escuelas: formData.get("permiso_escuelas") === "on",
     seguimientos: formData.get("permiso_seguimientos") === "on",
     entregas: formData.get("permiso_entregas") === "on",
+    encuestas: formData.get("permiso_encuestas") === "on",
   };
 
   const { error } = await supabase.from("profiles").update({ permisos }).eq("id", userId);
