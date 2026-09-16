@@ -1,17 +1,61 @@
 import { createClient } from "@/lib/supabase/server";
+import { requireUser, tienePermiso } from "@/lib/auth";
 import StatCard from "@/components/StatCard";
 import { EstadoBadge } from "@/components/Badge";
 import Link from "next/link";
-import type { Escuela } from "@/types/database";
+import type { Escuela, Seguimiento } from "@/types/database";
+
+function formatFechaCorta(fecha: string) {
+  const [anio, mes, dia] = fecha.split("-");
+  return `${dia}.${mes}.${anio}`;
+}
+
+function aFechaISO(d: Date) {
+  return d.toISOString().slice(0, 10);
+}
+
+type SeguimientoPermanencia = Pick<
+  Seguimiento,
+  "id" | "pdv_solicitud" | "fecha_ingreso" | "aspirante_aprobado"
+> & { escuelas: { nombre: string } | null };
+
+// Aspirantes con proceso finalizado cuya fecha de ingreso cae entre 3 y 6
+// meses atras de hoy (ventana de seguimiento de permanencia en el PDV).
+async function cargarSeguimientosPermanencia(
+  supabase: ReturnType<typeof createClient>
+): Promise<SeguimientoPermanencia[]> {
+  const hoy = new Date();
+  const hace3Meses = new Date(hoy);
+  hace3Meses.setMonth(hoy.getMonth() - 3);
+  const hace6Meses = new Date(hoy);
+  hace6Meses.setMonth(hoy.getMonth() - 6);
+
+  const { data } = await supabase
+    .from("seguimientos")
+    .select("id, pdv_solicitud, fecha_ingreso, aspirante_aprobado, escuelas(nombre)")
+    .eq("estado_proceso", "FINALIZADO")
+    .not("aspirante_aprobado", "is", null)
+    .not("fecha_ingreso", "is", null)
+    .gte("fecha_ingreso", aFechaISO(hace6Meses))
+    .lte("fecha_ingreso", aFechaISO(hace3Meses))
+    .order("fecha_ingreso", { ascending: true })
+    .returns<SeguimientoPermanencia[]>();
+
+  return data ?? [];
+}
 
 export default async function DashboardPage() {
+  const { profile } = await requireUser();
   const supabase = createClient();
 
-  const [{ data: escuelas }, { count: seguimientosCount }, { count: entregasCount }] =
+  const puedeVerSeguimientos = tienePermiso(profile, "seguimientos");
+
+  const [{ data: escuelas }, { count: seguimientosCount }, { count: entregasCount }, permanencia] =
     await Promise.all([
       supabase.from("escuelas").select("*").returns<Escuela[]>(),
       supabase.from("seguimientos").select("*", { count: "exact", head: true }),
       supabase.from("entregas").select("*", { count: "exact", head: true }),
+      puedeVerSeguimientos ? cargarSeguimientosPermanencia(supabase) : Promise.resolve([]),
     ]);
 
   const total = escuelas?.length ?? 0;
@@ -87,6 +131,42 @@ export default async function DashboardPage() {
           </div>
         </div>
       </div>
+
+      {puedeVerSeguimientos && (
+        <div className="card p-5">
+          <div className="flex items-center justify-between mb-1">
+            <h2 className="font-semibold">Seguimiento de permanencia (3 a 6 meses)</h2>
+          </div>
+          <p className="text-xs text-neutral-400 mb-3">
+            Aspirantes aprobados con proceso finalizado cuya fecha de ingreso cumplió entre 3 y 6
+            meses.
+          </p>
+          <div className="divide-y divide-neutral-100">
+            {permanencia.map((s) => (
+              <Link
+                key={s.id}
+                href={`/seguimientos/${s.id}/editar`}
+                className="flex items-center justify-between py-3 hover:bg-neutral-50 -mx-2 px-2 rounded-lg"
+              >
+                <div>
+                  <div className="text-udh-600 font-medium">{s.pdv_solicitud || "—"}</div>
+                  <div className="text-xs text-neutral-400">
+                    {s.aspirante_aprobado} · {s.escuelas?.nombre ?? "—"}
+                  </div>
+                </div>
+                <div className="text-lg font-semibold text-neutral-800">
+                  {s.fecha_ingreso ? formatFechaCorta(s.fecha_ingreso) : "—"}
+                </div>
+              </Link>
+            ))}
+            {permanencia.length === 0 && (
+              <p className="text-sm text-neutral-400 py-3">
+                No hay aspirantes en esta ventana de seguimiento por ahora.
+              </p>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
