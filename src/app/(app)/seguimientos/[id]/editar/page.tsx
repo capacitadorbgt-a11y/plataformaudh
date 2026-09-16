@@ -107,12 +107,8 @@ export default async function EditarSeguimientoPage({
 
         <div className="grid sm:grid-cols-2 gap-4">
           <div>
-            <label className="label">Aspirante aprobado</label>
-            <input
-              className="input"
-              name="aspirante_aprobado"
-              defaultValue={seguimiento.aspirante_aprobado ?? ""}
-            />
+            <label className="label">Analista</label>
+            <input className="input" name="analista" defaultValue={seguimiento.analista ?? ""} />
           </div>
           <div>
             <label className="label">PDV solicitud</label>
@@ -122,6 +118,21 @@ export default async function EditarSeguimientoPage({
                 <option key={p.id} value={p.nombre}>{p.nombre}</option>
               ))}
             </select>
+          </div>
+        </div>
+
+        <div className="grid sm:grid-cols-2 gap-4">
+          <div>
+            <label className="label">Aspirante aprobado</label>
+            <input
+              className="input"
+              name="aspirante_aprobado"
+              defaultValue={seguimiento.aspirante_aprobado ?? ""}
+            />
+          </div>
+          <div>
+            <label className="label">Capacitador</label>
+            <input className="input" name="capacitador" defaultValue={seguimiento.capacitador ?? ""} />
           </div>
         </div>
 
@@ -135,20 +146,14 @@ export default async function EditarSeguimientoPage({
           />
         </div>
 
-        <div className="grid sm:grid-cols-2 gap-4">
-          <div>
-            <label className="label">Fecha de ingreso</label>
-            <input
-              className="input"
-              type="date"
-              name="fecha_ingreso"
-              defaultValue={seguimiento.fecha_ingreso ?? ""}
-            />
-          </div>
-          <div>
-            <label className="label">Analista</label>
-            <input className="input" name="analista" defaultValue={seguimiento.analista ?? ""} />
-          </div>
+        <div>
+          <label className="label">Fecha de ingreso</label>
+          <input
+            className="input"
+            type="date"
+            name="fecha_ingreso"
+            defaultValue={seguimiento.fecha_ingreso ?? ""}
+          />
         </div>
 
         <div>

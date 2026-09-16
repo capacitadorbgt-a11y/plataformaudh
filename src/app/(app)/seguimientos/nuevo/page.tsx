@@ -70,8 +70,8 @@ export default async function NuevoSeguimientoPage({
 
         <div className="grid sm:grid-cols-2 gap-4">
           <div>
-            <label className="label">Aspirante aprobado</label>
-            <input className="input" name="aspirante_aprobado" />
+            <label className="label">Analista</label>
+            <input className="input" name="analista" />
           </div>
           <div>
             <label className="label">PDV solicitud</label>
@@ -84,20 +84,25 @@ export default async function NuevoSeguimientoPage({
           </div>
         </div>
 
+        <div className="grid sm:grid-cols-2 gap-4">
+          <div>
+            <label className="label">Aspirante aprobado</label>
+            <input className="input" name="aspirante_aprobado" />
+          </div>
+          <div>
+            <label className="label">Capacitador</label>
+            <input className="input" name="capacitador" />
+          </div>
+        </div>
+
         <div>
           <label className="label">PDV solicitud (si no está en la lista)</label>
           <input className="input" name="pdv_solicitud_libre" placeholder="Escribe el nombre del PDV" />
         </div>
 
-        <div className="grid sm:grid-cols-2 gap-4">
-          <div>
-            <label className="label">Fecha de ingreso</label>
-            <input className="input" type="date" name="fecha_ingreso" />
-          </div>
-          <div>
-            <label className="label">Analista</label>
-            <input className="input" name="analista" />
-          </div>
+        <div>
+          <label className="label">Fecha de ingreso</label>
+          <input className="input" type="date" name="fecha_ingreso" />
         </div>
 
         <div>

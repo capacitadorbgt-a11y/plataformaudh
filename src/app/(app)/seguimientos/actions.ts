@@ -43,6 +43,7 @@ export async function createSeguimiento(formData: FormData) {
     aspirante_aprobado: toNullableStr(formData.get("aspirante_aprobado")),
     observaciones: toNullableStr(formData.get("observaciones")),
     analista: toNullableStr(formData.get("analista")),
+    capacitador: toNullableStr(formData.get("capacitador")),
     created_by: user.id,
   });
 
@@ -86,6 +87,7 @@ export async function updateSeguimiento(id: string, formData: FormData) {
       aspirante_aprobado: toNullableStr(formData.get("aspirante_aprobado")),
       observaciones: toNullableStr(formData.get("observaciones")),
       analista: toNullableStr(formData.get("analista")),
+      capacitador: toNullableStr(formData.get("capacitador")),
     })
     .eq("id", id);
 

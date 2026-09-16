@@ -101,6 +101,7 @@ export interface Seguimiento {
   reembolso: string | null;
   observaciones: string | null;
   analista: string | null;
+  capacitador: string | null;
   pago1: string | null;
   pago2: string | null;
   created_by: string | null;
