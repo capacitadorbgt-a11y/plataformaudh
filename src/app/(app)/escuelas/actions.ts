@@ -124,6 +124,22 @@ const TIPOS_INFORME_PERMITIDOS = [
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 ];
 
+// Supabase Storage rechaza ciertas claves (tildes, espacios, etc.) con
+// "Invalid key". El nombre original y legible se guarda aparte en
+// nombre_archivo; aqui solo se genera una clave segura para el storage.
+function sanitizeStorageKey(nombre: string) {
+  const sinAcentos = nombre
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "");
+  const partes = sinAcentos.split(/(\.[^.]+)$/); // separa la extension
+  const base = (partes[0] || "archivo")
+    .replace(/[^a-zA-Z0-9._-]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
+  const extension = (partes[1] || "").replace(/[^a-zA-Z0-9.]/g, "");
+  return (base || "archivo") + extension;
+}
+
 export async function uploadInforme(escuelaId: string, formData: FormData) {
   const { user } = await requireUser();
   const supabase = createClient();
@@ -138,7 +154,7 @@ export async function uploadInforme(escuelaId: string, formData: FormData) {
     return { error: "Tipo de archivo no permitido. Sube un PDF, Word (doc/docx) o Excel (xls/xlsx)." };
   }
 
-  const rutaStorage = `${escuelaId}/${Date.now()}-${file.name}`;
+  const rutaStorage = `${escuelaId}/${Date.now()}-${sanitizeStorageKey(file.name)}`;
   const { error: uploadError } = await supabase.storage.from("informes").upload(rutaStorage, file);
 
   if (uploadError) {

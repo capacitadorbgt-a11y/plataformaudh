@@ -19,9 +19,9 @@ export default function InformeUploadForm({ escuelaId }: { escuelaId: string }) 
         ref={formRef}
         action={handleSubmit}
         encType="multipart/form-data"
-        className="flex flex-wrap gap-3 items-end border-t border-neutral-100 pt-4"
+        className="border-t border-neutral-100 pt-4 space-y-3"
       >
-        <div className="flex-1 min-w-[220px]">
+        <div>
           <label className="label">Archivo (PDF, Word o Excel)</label>
           <input
             className="input"
@@ -31,11 +31,12 @@ export default function InformeUploadForm({ escuelaId }: { escuelaId: string }) 
             required
           />
         </div>
-        <button type="submit" disabled={isPending} className="btn-primary disabled:opacity-50">
-          {isPending ? "Subiendo..." : "+ Agregar informe"}
-        </button>
 
-        {error && <p className="w-full text-sm text-red-600">{error}</p>}
+        {error && <p className="text-sm text-red-600">{error}</p>}
+
+        <button type="submit" disabled={isPending} className="btn-primary disabled:opacity-50">
+          {isPending ? "Guardando..." : "Guardar"}
+        </button>
       </form>
 
       {showModal && (
