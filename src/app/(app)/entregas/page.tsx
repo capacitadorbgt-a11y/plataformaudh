@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requirePermiso } from "@/lib/auth";
 import type { Entrega, Escuela } from "@/types/database";
 import Link from "next/link";
+import EntregasTable from "@/components/EntregasTable";
 
 interface EntregasSearchParams {
   escuela_id?: string;
@@ -52,11 +53,14 @@ export default async function EntregasPage({
 
   return (
     <div className="space-y-4">
-      <div>
-        <h1 className="text-xl font-bold">Recompensas y material entregado</h1>
-        <p className="text-sm text-neutral-500">
-          Registro nacional de camisetas, entradas de cine, cheques y otros materiales
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-bold">Recompensas y material entregado</h1>
+          <p className="text-sm text-neutral-500">
+            Registro nacional de camisetas, entradas de cine, cheques, pagos y otros materiales
+          </p>
+        </div>
+        <Link href="/entregas/nueva" className="btn-primary">+ Nueva recompensa</Link>
       </div>
 
       <form className="card p-4 grid sm:grid-cols-2 lg:grid-cols-5 gap-3 items-end">
@@ -76,6 +80,7 @@ export default async function EntregasPage({
             <option value="CAMISETA">CAMISETA</option>
             <option value="ENTRADA_CINE">ENTRADA CINE</option>
             <option value="CHEQUE">CHEQUE</option>
+            <option value="PAGO">PAGO</option>
             <option value="OTRO">OTRO</option>
           </select>
         </div>
@@ -95,43 +100,7 @@ export default async function EntregasPage({
         </div>
       </form>
 
-      <div className="card overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-neutral-200 text-left text-neutral-500">
-              <th className="px-4 py-3 font-medium">Escuela</th>
-              <th className="px-4 py-3 font-medium">Tipo</th>
-              <th className="px-4 py-3 font-medium">Cantidad</th>
-              <th className="px-4 py-3 font-medium">Detalle</th>
-              <th className="px-4 py-3 font-medium">Fecha</th>
-            </tr>
-          </thead>
-          <tbody>
-            {entregas?.map((e) => (
-              <tr key={e.id} className="border-b border-neutral-100 last:border-0 hover:bg-neutral-50">
-                <td className="px-4 py-3 font-medium">
-                  {e.escuelas ? (
-                    <Link href={`/escuelas/${e.escuelas.id}`} className="hover:underline">
-                      {e.escuelas.nombre}
-                    </Link>
-                  ) : "—"}
-                </td>
-                <td className="px-4 py-3 text-neutral-600">{e.tipo}</td>
-                <td className="px-4 py-3 text-neutral-600">{e.cantidad ?? "—"}</td>
-                <td className="px-4 py-3 text-neutral-600">{e.detalle ?? "—"}</td>
-                <td className="px-4 py-3 text-neutral-600">{e.fecha ?? "—"}</td>
-              </tr>
-            ))}
-            {entregas?.length === 0 && (
-              <tr>
-                <td colSpan={5} className="px-4 py-8 text-center text-neutral-400">
-                  No se encontraron entregas con esos filtros.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+      <EntregasTable entregas={entregas ?? []} />
     </div>
   );
 }

@@ -26,6 +26,7 @@ export default function EntregaAddForm({ escuelaId }: { escuelaId: string }) {
             <option value="CAMISETA">CAMISETA</option>
             <option value="ENTRADA_CINE">ENTRADA CINE</option>
             <option value="CHEQUE">CHEQUE</option>
+            <option value="PAGO">PAGO</option>
             <option value="OTRO">OTRO</option>
           </select>
         </div>

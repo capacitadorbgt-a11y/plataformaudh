@@ -1,7 +1,7 @@
 export type UserRole = "admin_udh" | "analista";
 export type EstadoEscuela = "ACTIVO" | "INACTIVO" | "REVISION";
 export type RolColaborador = "ADMIN" | "POLI" | "OTRO";
-export type TipoEntrega = "CAMISETA" | "ENTRADA_CINE" | "CHEQUE" | "OTRO";
+export type TipoEntrega = "CAMISETA" | "ENTRADA_CINE" | "CHEQUE" | "PAGO" | "OTRO";
 
 export interface PermisosHerramientas {
   escuelas?: boolean;
