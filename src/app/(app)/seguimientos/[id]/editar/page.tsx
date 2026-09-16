@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { requireUser } from "@/lib/auth";
+import { requirePermiso } from "@/lib/auth";
 import { notFound } from "next/navigation";
 import { updateSeguimiento } from "../../actions";
 import type { Escuela, Seguimiento } from "@/types/database";
@@ -11,7 +11,7 @@ export default async function EditarSeguimientoPage({
   params: { id: string };
   searchParams: { error?: string };
 }) {
-  await requireUser();
+  await requirePermiso("seguimientos");
   const supabase = createClient();
 
   const [{ data: escuelas }, { data: pdvs }, { data: seguimiento }] = await Promise.all([

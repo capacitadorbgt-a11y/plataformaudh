@@ -18,11 +18,27 @@ export async function requireUser() {
 
   if (!profile) redirect("/login");
 
+  if (!profile.activo) {
+    await supabase.auth.signOut();
+    redirect("/login?error=" + encodeURIComponent("Tu cuenta fue desactivada. Contacta a un Admin UDH."));
+  }
+
   return { user, profile };
 }
 
 export async function requireAdmin() {
   const { user, profile } = await requireUser();
   if (profile.role !== "admin_udh") redirect("/");
+  return { user, profile };
+}
+
+export function tienePermiso(profile: Profile, herramienta: "escuelas" | "seguimientos" | "entregas") {
+  if (profile.role === "admin_udh") return true;
+  return profile.permisos?.[herramienta] !== false;
+}
+
+export async function requirePermiso(herramienta: "escuelas" | "seguimientos" | "entregas") {
+  const { user, profile } = await requireUser();
+  if (!tienePermiso(profile, herramienta)) redirect("/");
   return { user, profile };
 }

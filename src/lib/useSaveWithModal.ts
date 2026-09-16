@@ -29,5 +29,14 @@ export function useSaveWithModal() {
     router.push("/escuelas");
   }
 
-  return { showModal, error, isPending, run, goToEscuelas, setShowModal };
+  function goTo(path: string) {
+    setShowModal(false);
+    router.push(path);
+  }
+
+  function closeModal() {
+    setShowModal(false);
+  }
+
+  return { showModal, error, isPending, run, goToEscuelas, goTo, closeModal, setShowModal };
 }

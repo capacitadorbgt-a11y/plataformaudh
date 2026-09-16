@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { requireUser } from "@/lib/auth";
+import { requirePermiso } from "@/lib/auth";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { EstadoBadge, RolBadge } from "@/components/Badge";
@@ -25,7 +25,7 @@ export default async function EscuelaDetailPage({
   params: { id: string };
   searchParams: { error?: string };
 }) {
-  const { profile } = await requireUser();
+  const { profile } = await requirePermiso("escuelas");
   const supabase = createClient();
 
   const { data: escuela } = await supabase

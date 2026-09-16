@@ -1,7 +1,8 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
-import { requireAdmin, requireUser } from "@/lib/auth";
+import { requireAdmin, requirePermiso } from "@/lib/auth";
+import { logAudit } from "@/lib/audit";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
@@ -15,13 +16,15 @@ function toNullableStr(v: FormDataEntryValue | null) {
 }
 
 export async function createEscuela(formData: FormData) {
-  await requireAdmin();
+  const { user } = await requireAdmin();
   const supabase = createClient();
+
+  const nombre = String(formData.get("nombre"));
 
   const { data, error } = await supabase
     .from("escuelas")
     .insert({
-      nombre: String(formData.get("nombre")),
+      nombre,
       capacidad: toNullableInt(formData.get("capacidad")),
       provincia: toNullableStr(formData.get("provincia")),
       ciudad: toNullableStr(formData.get("ciudad")),
@@ -36,12 +39,14 @@ export async function createEscuela(formData: FormData) {
     redirect(`/escuelas/nueva?error=${encodeURIComponent(error.message)}`);
   }
 
+  await logAudit(user.id, "crear_escuela", { entidad: "escuela", entidadId: data!.id, detalle: nombre });
+
   revalidatePath("/escuelas");
   redirect(`/escuelas/${data!.id}`);
 }
 
 export async function updateEscuela(escuelaId: string, formData: FormData) {
-  await requireUser();
+  const { user } = await requirePermiso("escuelas");
   const supabase = createClient();
 
   const { error } = await supabase
@@ -62,16 +67,19 @@ export async function updateEscuela(escuelaId: string, formData: FormData) {
   revalidatePath("/escuelas");
 
   if (error) return { error: error.message };
+
+  await logAudit(user.id, "editar_escuela", { entidad: "escuela", entidadId: escuelaId });
   return { error: null };
 }
 
 export async function addColaborador(escuelaId: string, formData: FormData) {
-  await requireAdmin();
+  const { user } = await requireAdmin();
   const supabase = createClient();
+  const nombre = String(formData.get("nombre"));
 
   const { error } = await supabase.from("colaboradores").insert({
     escuela_id: escuelaId,
-    nombre: String(formData.get("nombre")),
+    nombre,
     rol: String(formData.get("rol") || "OTRO"),
     cedula: toNullableStr(formData.get("cedula")),
     datos_bancarios: toNullableStr(formData.get("datos_bancarios")),
@@ -81,6 +89,8 @@ export async function addColaborador(escuelaId: string, formData: FormData) {
   revalidatePath(`/escuelas/${escuelaId}`);
 
   if (error) return { error: error.message };
+
+  await logAudit(user.id, "crear_colaborador", { entidad: "escuela", entidadId: escuelaId, detalle: nombre });
   return { error: null };
 }
 
@@ -89,7 +99,7 @@ export async function updateColaborador(
   colaboradorId: string,
   formData: FormData
 ) {
-  await requireAdmin();
+  const { user } = await requireAdmin();
   const supabase = createClient();
 
   const { error } = await supabase
@@ -106,13 +116,16 @@ export async function updateColaborador(
   revalidatePath(`/escuelas/${escuelaId}`);
 
   if (error) return { error: error.message };
+
+  await logAudit(user.id, "editar_colaborador", { entidad: "colaborador", entidadId: colaboradorId });
   return { error: null };
 }
 
 export async function deleteColaborador(escuelaId: string, colaboradorId: string) {
-  await requireAdmin();
+  const { user } = await requireAdmin();
   const supabase = createClient();
   await supabase.from("colaboradores").delete().eq("id", colaboradorId);
+  await logAudit(user.id, "eliminar_colaborador", { entidad: "colaborador", entidadId: colaboradorId });
   revalidatePath(`/escuelas/${escuelaId}`);
 }
 
@@ -141,7 +154,7 @@ function sanitizeStorageKey(nombre: string) {
 }
 
 export async function uploadInforme(escuelaId: string, formData: FormData) {
-  const { user } = await requireUser();
+  const { user } = await requirePermiso("escuelas");
   const supabase = createClient();
 
   const archivo = formData.get("archivo");
@@ -173,21 +186,24 @@ export async function uploadInforme(escuelaId: string, formData: FormData) {
   revalidatePath(`/escuelas/${escuelaId}`);
 
   if (error) return { error: error.message };
+
+  await logAudit(user.id, "subir_informe", { entidad: "escuela", entidadId: escuelaId, detalle: file.name });
   return { error: null };
 }
 
 export async function deleteInforme(escuelaId: string, informeId: string, storagePath: string) {
-  await requireAdmin();
+  const { user } = await requireAdmin();
   const supabase = createClient();
 
   await supabase.storage.from("informes").remove([storagePath]);
   await supabase.from("informes").delete().eq("id", informeId);
 
+  await logAudit(user.id, "eliminar_informe", { entidad: "informe", entidadId: informeId });
   revalidatePath(`/escuelas/${escuelaId}`);
 }
 
 export async function addEntrega(escuelaId: string, formData: FormData) {
-  await requireUser();
+  const { user } = await requirePermiso("entregas");
   const supabase = createClient();
 
   const { error } = await supabase.from("entregas").insert({
@@ -202,5 +218,7 @@ export async function addEntrega(escuelaId: string, formData: FormData) {
   revalidatePath("/entregas");
 
   if (error) return { error: error.message };
+
+  await logAudit(user.id, "registrar_entrega", { entidad: "escuela", entidadId: escuelaId });
   return { error: null };
 }

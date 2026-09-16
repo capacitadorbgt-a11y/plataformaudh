@@ -3,10 +3,28 @@ export type EstadoEscuela = "ACTIVO" | "INACTIVO" | "REVISION";
 export type RolColaborador = "ADMIN" | "POLI" | "OTRO";
 export type TipoEntrega = "CAMISETA" | "ENTRADA_CINE" | "CHEQUE" | "OTRO";
 
+export interface PermisosHerramientas {
+  escuelas?: boolean;
+  seguimientos?: boolean;
+  entregas?: boolean;
+}
+
 export interface Profile {
   id: string;
   nombre: string;
   role: UserRole;
+  activo: boolean;
+  permisos: PermisosHerramientas;
+  created_at: string;
+}
+
+export interface AuditLogEntry {
+  id: string;
+  user_id: string | null;
+  accion: string;
+  entidad: string | null;
+  entidad_id: string | null;
+  detalle: string | null;
   created_at: string;
 }
 

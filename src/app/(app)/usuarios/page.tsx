@@ -1,6 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { requireAdmin } from "@/lib/auth";
-import { updateUserRole } from "./actions";
+import Link from "next/link";
+import UsuarioCreateForm from "@/components/UsuarioCreateForm";
+import UsuarioRow from "@/components/UsuarioRow";
 import type { Profile } from "@/types/database";
 
 export default async function UsuariosPage() {
@@ -14,43 +16,32 @@ export default async function UsuariosPage() {
     .returns<Profile[]>();
 
   return (
-    <div className="space-y-4">
-      <div>
-        <h1 className="text-xl font-bold">Usuarios</h1>
-        <p className="text-sm text-neutral-500">
-          Roles de acceso al sistema. Crea las cuentas desde el panel de Supabase (Authentication)
-          y luego asigna aquí el rol correspondiente.
-        </p>
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-bold">Usuarios</h1>
+          <p className="text-sm text-neutral-500">
+            Roles, permisos por herramienta y acceso al sistema.
+          </p>
+        </div>
+        <Link href="/auditoria" className="btn-secondary">Ver auditoría</Link>
       </div>
+
+      <UsuarioCreateForm />
 
       <div className="card overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-neutral-200 text-left text-neutral-500">
-              <th className="px-4 py-3 font-medium">Nombre</th>
+              <th className="px-4 py-3 font-medium">Usuario</th>
               <th className="px-4 py-3 font-medium">Rol</th>
-              <th className="px-4 py-3 font-medium">Cambiar rol</th>
+              <th className="px-4 py-3 font-medium">Acceso a herramientas</th>
+              <th className="px-4 py-3 font-medium">Cuenta</th>
             </tr>
           </thead>
           <tbody>
             {usuarios?.map((u) => (
-              <tr key={u.id} className="border-b border-neutral-100 last:border-0">
-                <td className="px-4 py-3 font-medium">
-                  {u.nombre} {u.id === me.id && <span className="text-xs text-neutral-400">(tú)</span>}
-                </td>
-                <td className="px-4 py-3 text-neutral-600">
-                  {u.role === "admin_udh" ? "Admin UDH" : "Analista"}
-                </td>
-                <td className="px-4 py-3">
-                  <form action={updateUserRole.bind(null, u.id)} className="flex gap-2">
-                    <select className="input" name="role" defaultValue={u.role}>
-                      <option value="admin_udh">Admin UDH</option>
-                      <option value="analista">Analista</option>
-                    </select>
-                    <button type="submit" className="btn-secondary text-xs">Guardar</button>
-                  </form>
-                </td>
-              </tr>
+              <UsuarioRow key={u.id} usuario={u} esUsuarioActual={u.id === me.id} />
             ))}
           </tbody>
         </table>

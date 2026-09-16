@@ -3,15 +3,21 @@ import { signOut } from "@/app/login/actions";
 import type { Profile } from "@/types/database";
 
 export default function Navbar({ profile }: { profile: Profile }) {
-  const links = [
-    { href: "/", label: "Panel" },
-    { href: "/escuelas", label: "Escuelas" },
-    { href: "/seguimientos", label: "Seguimientos" },
-    { href: "/entregas", label: "Recompensas y material" },
-  ];
+  const esAdmin = profile.role === "admin_udh";
+  const links = [{ href: "/", label: "Panel" }];
 
-  if (profile.role === "admin_udh") {
+  if (esAdmin || profile.permisos?.escuelas !== false) {
+    links.push({ href: "/escuelas", label: "Escuelas" });
+  }
+  if (esAdmin || profile.permisos?.seguimientos !== false) {
+    links.push({ href: "/seguimientos", label: "Seguimientos" });
+  }
+  if (esAdmin || profile.permisos?.entregas !== false) {
+    links.push({ href: "/entregas", label: "Recompensas y material" });
+  }
+  if (esAdmin) {
     links.push({ href: "/usuarios", label: "Usuarios" });
+    links.push({ href: "/auditoria", label: "Auditoría" });
   }
 
   return (

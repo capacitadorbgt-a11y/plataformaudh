@@ -1,7 +1,8 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
-import { requireUser } from "@/lib/auth";
+import { requirePermiso } from "@/lib/auth";
+import { logAudit } from "@/lib/audit";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
@@ -15,7 +16,7 @@ function toNullableInt(v: FormDataEntryValue | null) {
 }
 
 export async function createSeguimiento(formData: FormData) {
-  const { user } = await requireUser();
+  const { user } = await requirePermiso("seguimientos");
   const supabase = createClient();
 
   const escuelaId = toNullableStr(formData.get("escuela_id"));
@@ -48,12 +49,14 @@ export async function createSeguimiento(formData: FormData) {
     redirect(`/seguimientos/nuevo?error=${encodeURIComponent(error.message)}`);
   }
 
+  await logAudit(user.id, "crear_seguimiento");
+
   revalidatePath("/seguimientos");
   redirect("/seguimientos");
 }
 
 export async function updateSeguimiento(id: string, formData: FormData) {
-  await requireUser();
+  const { user } = await requirePermiso("seguimientos");
   const supabase = createClient();
 
   const escuelaId = toNullableStr(formData.get("escuela_id"));
@@ -87,6 +90,8 @@ export async function updateSeguimiento(id: string, formData: FormData) {
   if (error) {
     redirect(`/seguimientos/${id}/editar?error=${encodeURIComponent(error.message)}`);
   }
+
+  await logAudit(user.id, "editar_seguimiento", { entidad: "seguimiento", entidadId: id });
 
   revalidatePath("/seguimientos");
   redirect("/seguimientos");

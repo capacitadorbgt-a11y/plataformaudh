@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { requireUser } from "@/lib/auth";
+import { requirePermiso } from "@/lib/auth";
 import type { Entrega, Escuela } from "@/types/database";
 import Link from "next/link";
 
@@ -15,7 +15,7 @@ export default async function EntregasPage({
 }: {
   searchParams: EntregasSearchParams;
 }) {
-  await requireUser();
+  await requirePermiso("entregas");
   const supabase = createClient();
 
   const { data: escuelas } = await supabase

@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { requireUser } from "@/lib/auth";
+import { requirePermiso } from "@/lib/auth";
 import Link from "next/link";
 import { EstadoBadge } from "@/components/Badge";
 import type { Escuela } from "@/types/database";
@@ -9,7 +9,7 @@ export default async function EscuelasPage({
 }: {
   searchParams: { q?: string; estado?: string };
 }) {
-  const { profile } = await requireUser();
+  const { profile } = await requirePermiso("escuelas");
   const supabase = createClient();
 
   let query = supabase.from("escuelas").select("*").order("nombre");

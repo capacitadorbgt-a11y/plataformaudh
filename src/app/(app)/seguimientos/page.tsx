@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { requireUser } from "@/lib/auth";
+import { requirePermiso } from "@/lib/auth";
 import Link from "next/link";
 import type { Escuela, Seguimiento } from "@/types/database";
 import SeguimientosTable from "@/components/SeguimientosTable";
@@ -17,7 +17,7 @@ export default async function SeguimientosPage({
 }: {
   searchParams: SeguimientosSearchParams;
 }) {
-  await requireUser();
+  await requirePermiso("seguimientos");
   const supabase = createClient();
 
   const { data: escuelas } = await supabase
