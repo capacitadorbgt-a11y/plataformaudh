@@ -69,7 +69,7 @@ export async function addColaborador(escuelaId: string, formData: FormData) {
   await requireAdmin();
   const supabase = createClient();
 
-  await supabase.from("colaboradores").insert({
+  const { error } = await supabase.from("colaboradores").insert({
     escuela_id: escuelaId,
     nombre: String(formData.get("nombre")),
     rol: String(formData.get("rol") || "OTRO"),
@@ -79,6 +79,9 @@ export async function addColaborador(escuelaId: string, formData: FormData) {
   });
 
   revalidatePath(`/escuelas/${escuelaId}`);
+
+  if (error) return { error: error.message };
+  return { error: null };
 }
 
 export async function updateColaborador(
@@ -89,7 +92,7 @@ export async function updateColaborador(
   await requireAdmin();
   const supabase = createClient();
 
-  await supabase
+  const { error } = await supabase
     .from("colaboradores")
     .update({
       nombre: String(formData.get("nombre")),
@@ -101,6 +104,9 @@ export async function updateColaborador(
     .eq("id", colaboradorId);
 
   revalidatePath(`/escuelas/${escuelaId}`);
+
+  if (error) return { error: error.message };
+  return { error: null };
 }
 
 export async function deleteColaborador(escuelaId: string, colaboradorId: string) {
@@ -124,26 +130,22 @@ export async function uploadInforme(escuelaId: string, formData: FormData) {
 
   const archivo = formData.get("archivo");
   if (!(archivo instanceof File) || archivo.size === 0) {
-    redirect(`/escuelas/${escuelaId}?error=${encodeURIComponent("Selecciona un archivo para subir")}`);
+    return { error: "Selecciona un archivo para subir" };
   }
 
   const file = archivo as File;
   if (TIPOS_INFORME_PERMITIDOS.length && file.type && !TIPOS_INFORME_PERMITIDOS.includes(file.type)) {
-    redirect(
-      `/escuelas/${escuelaId}?error=${encodeURIComponent(
-        "Tipo de archivo no permitido. Sube un PDF, Word (doc/docx) o Excel (xls/xlsx)."
-      )}`
-    );
+    return { error: "Tipo de archivo no permitido. Sube un PDF, Word (doc/docx) o Excel (xls/xlsx)." };
   }
 
   const rutaStorage = `${escuelaId}/${Date.now()}-${file.name}`;
   const { error: uploadError } = await supabase.storage.from("informes").upload(rutaStorage, file);
 
   if (uploadError) {
-    redirect(`/escuelas/${escuelaId}?error=${encodeURIComponent(uploadError.message)}`);
+    return { error: uploadError.message };
   }
 
-  await supabase.from("informes").insert({
+  const { error } = await supabase.from("informes").insert({
     escuela_id: escuelaId,
     nombre_archivo: file.name,
     tipo_archivo: file.type || null,
@@ -153,6 +155,9 @@ export async function uploadInforme(escuelaId: string, formData: FormData) {
   });
 
   revalidatePath(`/escuelas/${escuelaId}`);
+
+  if (error) return { error: error.message };
+  return { error: null };
 }
 
 export async function deleteInforme(escuelaId: string, informeId: string, storagePath: string) {
@@ -169,7 +174,7 @@ export async function addEntrega(escuelaId: string, formData: FormData) {
   await requireUser();
   const supabase = createClient();
 
-  await supabase.from("entregas").insert({
+  const { error } = await supabase.from("entregas").insert({
     escuela_id: escuelaId,
     tipo: String(formData.get("tipo") || "OTRO"),
     cantidad: toNullableInt(formData.get("cantidad")),
@@ -179,4 +184,7 @@ export async function addEntrega(escuelaId: string, formData: FormData) {
 
   revalidatePath(`/escuelas/${escuelaId}`);
   revalidatePath("/entregas");
+
+  if (error) return { error: error.message };
+  return { error: null };
 }

@@ -4,14 +4,11 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { EstadoBadge, RolBadge } from "@/components/Badge";
 import EscuelaFichaForm from "@/components/EscuelaFichaForm";
-import {
-  addColaborador,
-  updateColaborador,
-  deleteColaborador,
-  addEntrega,
-  uploadInforme,
-  deleteInforme,
-} from "../actions";
+import ColaboradorEditForm from "@/components/ColaboradorEditForm";
+import ColaboradorAddForm from "@/components/ColaboradorAddForm";
+import EntregaAddForm from "@/components/EntregaAddForm";
+import InformeUploadForm from "@/components/InformeUploadForm";
+import { deleteInforme } from "../actions";
 import type { Colaborador, Entrega, Escuela, Informe, Seguimiento } from "@/types/database";
 
 function formatBytes(bytes: number | null) {
@@ -77,10 +74,6 @@ export default async function EscuelaDetailPage({
     })
   );
 
-  const boundAddColaborador = addColaborador.bind(null, escuela.id);
-  const boundDeleteColaborador = deleteColaborador.bind(null, escuela.id);
-  const boundAddEntrega = addEntrega.bind(null, escuela.id);
-  const boundUploadInforme = uploadInforme.bind(null, escuela.id);
   const boundDeleteInforme = deleteInforme.bind(null, escuela.id);
 
   return (
@@ -121,54 +114,7 @@ export default async function EscuelaDetailPage({
         <div className="space-y-3 mb-4">
           {colaboradores?.map((c) =>
             isAdmin ? (
-              <form
-                key={c.id}
-                action={updateColaborador.bind(null, escuela.id, c.id)}
-                className="border border-neutral-100 rounded-lg p-3 grid sm:grid-cols-5 gap-3 items-end"
-              >
-                <div className="sm:col-span-2">
-                  <label className="label">Nombre</label>
-                  <input className="input" name="nombre" defaultValue={c.nombre} required />
-                </div>
-                <div>
-                  <label className="label">Rol</label>
-                  <select className="input" name="rol" defaultValue={c.rol}>
-                    <option value="ADMIN">ADMIN</option>
-                    <option value="POLI">POLI</option>
-                    <option value="OTRO">OTRO</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="label">Cédula</label>
-                  <input className="input" name="cedula" defaultValue={c.cedula ?? ""} />
-                </div>
-                <div>
-                  <label className="label">Fecha de ingreso</label>
-                  <input
-                    className="input"
-                    type="date"
-                    name="fecha_ingreso"
-                    defaultValue={c.fecha_ingreso ?? ""}
-                  />
-                </div>
-                <div className="sm:col-span-4">
-                  <label className="label">Datos bancarios (banco, cuenta)</label>
-                  <input className="input" name="datos_bancarios" defaultValue={c.datos_bancarios ?? ""} />
-                </div>
-                <div className="flex gap-2">
-                  <button type="submit" className="btn-secondary w-full">Guardar</button>
-                </div>
-                <div className="sm:col-span-5 flex justify-between items-center pt-1">
-                  <RolBadge rol={c.rol} />
-                  <button
-                    type="submit"
-                    formAction={boundDeleteColaborador.bind(null, c.id)}
-                    className="text-xs text-red-500 hover:underline"
-                  >
-                    Eliminar
-                  </button>
-                </div>
-              </form>
+              <ColaboradorEditForm key={c.id} escuelaId={escuela.id} colaborador={c} />
             ) : (
               <div key={c.id} className="border border-neutral-100 rounded-lg px-3 py-2">
                 <div className="text-sm font-medium flex items-center gap-2">
@@ -186,37 +132,7 @@ export default async function EscuelaDetailPage({
           )}
         </div>
 
-        {isAdmin && (
-          <form action={boundAddColaborador} className="grid sm:grid-cols-4 gap-3 items-end border-t border-neutral-100 pt-4">
-            <div className="sm:col-span-2">
-              <label className="label">Nombre</label>
-              <input className="input" name="nombre" required />
-            </div>
-            <div>
-              <label className="label">Rol</label>
-              <select className="input" name="rol" defaultValue="ADMIN">
-                <option value="ADMIN">ADMIN</option>
-                <option value="POLI">POLI</option>
-                <option value="OTRO">OTRO</option>
-              </select>
-            </div>
-            <div>
-              <label className="label">Cédula</label>
-              <input className="input" name="cedula" />
-            </div>
-            <div>
-              <label className="label">Fecha de ingreso</label>
-              <input className="input" type="date" name="fecha_ingreso" />
-            </div>
-            <div className="sm:col-span-2">
-              <label className="label">Datos bancarios (banco, cuenta)</label>
-              <input className="input" name="datos_bancarios" />
-            </div>
-            <div>
-              <button type="submit" className="btn-secondary w-full">+ Agregar colaborador</button>
-            </div>
-          </form>
-        )}
+        {isAdmin && <ColaboradorAddForm escuelaId={escuela.id} />}
       </div>
 
       {/* Informes */}
@@ -254,23 +170,7 @@ export default async function EscuelaDetailPage({
           )}
         </div>
 
-        <form
-          action={boundUploadInforme}
-          encType="multipart/form-data"
-          className="flex flex-wrap gap-3 items-end border-t border-neutral-100 pt-4"
-        >
-          <div className="flex-1 min-w-[220px]">
-            <label className="label">Archivo (PDF, Word o Excel)</label>
-            <input
-              className="input"
-              type="file"
-              name="archivo"
-              accept=".pdf,.doc,.docx,.xls,.xlsx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-              required
-            />
-          </div>
-          <button type="submit" className="btn-primary">+ Agregar informe</button>
-        </form>
+        <InformeUploadForm escuelaId={escuela.id} />
       </div>
 
       {/* Entregas / recompensas */}
@@ -292,32 +192,7 @@ export default async function EscuelaDetailPage({
           )}
         </div>
 
-        <form action={boundAddEntrega} className="grid sm:grid-cols-4 gap-3 items-end border-t border-neutral-100 pt-4">
-          <div>
-            <label className="label">Tipo</label>
-            <select className="input" name="tipo" defaultValue="CAMISETA">
-              <option value="CAMISETA">CAMISETA</option>
-              <option value="ENTRADA_CINE">ENTRADA CINE</option>
-              <option value="CHEQUE">CHEQUE</option>
-              <option value="OTRO">OTRO</option>
-            </select>
-          </div>
-          <div>
-            <label className="label">Cantidad</label>
-            <input className="input" type="number" name="cantidad" min={0} />
-          </div>
-          <div>
-            <label className="label">Fecha</label>
-            <input className="input" type="date" name="fecha" />
-          </div>
-          <div>
-            <button type="submit" className="btn-secondary w-full">Registrar</button>
-          </div>
-          <div className="sm:col-span-4">
-            <label className="label">Detalle (tallas, banco, etc.)</label>
-            <input className="input" name="detalle" />
-          </div>
-        </form>
+        <EntregaAddForm escuelaId={escuela.id} />
       </div>
 
       {/* Seguimientos de reclutamiento asociados */}

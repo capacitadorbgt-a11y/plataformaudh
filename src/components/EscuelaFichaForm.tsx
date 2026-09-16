@@ -1,27 +1,15 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
 import Modal from "@/components/Modal";
 import { updateEscuela } from "@/app/(app)/escuelas/actions";
+import { useSaveWithModal } from "@/lib/useSaveWithModal";
 import type { Escuela } from "@/types/database";
 
 export default function EscuelaFichaForm({ escuela }: { escuela: Escuela }) {
-  const [showModal, setShowModal] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [isPending, startTransition] = useTransition();
-  const router = useRouter();
+  const { showModal, error, isPending, run, goToEscuelas } = useSaveWithModal();
 
   function handleSubmit(formData: FormData) {
-    setError(null);
-    startTransition(async () => {
-      const result = await updateEscuela(escuela.id, formData);
-      if (result?.error) {
-        setError(result.error);
-      } else {
-        setShowModal(true);
-      }
-    });
+    run(() => updateEscuela(escuela.id, formData));
   }
 
   return (
@@ -84,7 +72,7 @@ export default function EscuelaFichaForm({ escuela }: { escuela: Escuela }) {
       </form>
 
       {showModal && (
-        <Modal title="Datos guardados" onClose={() => router.push("/escuelas")}>
+        <Modal title="Datos guardados" onClose={goToEscuelas}>
           La información de la escuela se guardó correctamente.
         </Modal>
       )}
