@@ -10,6 +10,8 @@ interface SeguimientosSearchParams {
   hasta?: string;
   cargo?: string;
   analista?: string;
+  capacitador?: string;
+  pdv_solicitud?: string;
   estado_proceso?: string;
 }
 
@@ -48,6 +50,12 @@ export default async function SeguimientosPage({
   if (searchParams.analista) {
     query = query.ilike("analista", `%${searchParams.analista}%`);
   }
+  if (searchParams.capacitador) {
+    query = query.ilike("capacitador", `%${searchParams.capacitador}%`);
+  }
+  if (searchParams.pdv_solicitud) {
+    query = query.ilike("pdv_solicitud", `%${searchParams.pdv_solicitud}%`);
+  }
   if (searchParams.estado_proceso) {
     query = query.eq("estado_proceso", searchParams.estado_proceso);
   }
@@ -62,6 +70,8 @@ export default async function SeguimientosPage({
     searchParams.hasta ||
     searchParams.cargo ||
     searchParams.analista ||
+    searchParams.capacitador ||
+    searchParams.pdv_solicitud ||
     searchParams.estado_proceso;
 
   return (
@@ -99,6 +109,14 @@ export default async function SeguimientosPage({
         <div>
           <label className="label">Analista</label>
           <input className="input" name="analista" placeholder="Nombre del analista" defaultValue={searchParams.analista ?? ""} />
+        </div>
+        <div>
+          <label className="label">Capacitador</label>
+          <input className="input" name="capacitador" placeholder="Nombre del capacitador" defaultValue={searchParams.capacitador ?? ""} />
+        </div>
+        <div>
+          <label className="label">PDV solicitud</label>
+          <input className="input" name="pdv_solicitud" placeholder="Nombre del PDV" defaultValue={searchParams.pdv_solicitud ?? ""} />
         </div>
         <div>
           <label className="label">Estado del proceso</label>
