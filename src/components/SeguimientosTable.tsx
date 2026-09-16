@@ -94,7 +94,7 @@ export default function SeguimientosTable({
               <th className="px-4 py-3 font-medium">Aspirantes</th>
               <th className="px-4 py-3 font-medium">Aprobado</th>
               <th className="px-4 py-3 font-medium">PDV solicitud</th>
-              <th className="px-4 py-3 font-medium">Analista</th>
+              <th className="px-4 py-3 font-medium">Capacitador</th>
             </tr>
           </thead>
           <tbody>
@@ -124,7 +124,7 @@ export default function SeguimientosTable({
                 <td className="px-4 py-3 text-neutral-600">{s.num_aspirantes ?? 0}</td>
                 <td className="px-4 py-3 text-neutral-600">{s.aspirante_aprobado ?? "—"}</td>
                 <td className="px-4 py-3 text-neutral-600">{s.pdv_solicitud ?? "—"}</td>
-                <td className="px-4 py-3 text-neutral-600">{s.analista ?? "—"}</td>
+                <td className="px-4 py-3 text-neutral-600">{s.capacitador ?? "—"}</td>
               </tr>
             ))}
             {seguimientos.length === 0 && (

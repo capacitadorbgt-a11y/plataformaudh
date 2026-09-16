@@ -11,6 +11,7 @@ const COLUMNAS = [
   "Aprobado",
   "PDV solicitud",
   "Analista",
+  "Capacitador",
   "Observaciones",
 ] as const;
 
@@ -28,6 +29,7 @@ function filaComoTexto(s: SeguimientoRow): string[] {
     s.aspirante_aprobado ?? "",
     s.pdv_solicitud ?? "",
     s.analista ?? "",
+    s.capacitador ?? "",
     s.observaciones ?? "",
   ];
 }
