@@ -105,6 +105,27 @@ export default async function NuevoSeguimientoPage({
           <input className="input" type="date" name="fecha_ingreso" />
         </div>
 
+        <div className="grid sm:grid-cols-2 gap-4">
+          <div>
+            <label className="label">Pago1</label>
+            <select className="input" name="pago1" defaultValue="">
+              <option value="">— Selecciona —</option>
+              <option value="Completo">Completo</option>
+              <option value="Parcial">Parcial</option>
+              <option value="No aplica">No aplica</option>
+            </select>
+          </div>
+          <div>
+            <label className="label">Pago2</label>
+            <select className="input" name="pago2" defaultValue="">
+              <option value="">— Selecciona —</option>
+              <option value="Completo">Completo</option>
+              <option value="Parcial">Parcial</option>
+              <option value="No aplica">No aplica</option>
+            </select>
+          </div>
+        </div>
+
         <div>
           <label className="label">Observaciones</label>
           <textarea className="input" name="observaciones" rows={3} />
