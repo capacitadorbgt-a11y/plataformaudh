@@ -44,7 +44,7 @@ export async function updateEscuela(escuelaId: string, formData: FormData) {
   await requireUser();
   const supabase = createClient();
 
-  await supabase
+  const { error } = await supabase
     .from("escuelas")
     .update({
       capacidad: toNullableInt(formData.get("capacidad")),
@@ -60,6 +60,9 @@ export async function updateEscuela(escuelaId: string, formData: FormData) {
 
   revalidatePath(`/escuelas/${escuelaId}`);
   revalidatePath("/escuelas");
+
+  if (error) return { error: error.message };
+  return { error: null };
 }
 
 export async function addColaborador(escuelaId: string, formData: FormData) {
