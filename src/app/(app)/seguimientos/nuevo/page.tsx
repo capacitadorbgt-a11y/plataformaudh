@@ -74,13 +74,8 @@ export default async function NuevoSeguimientoPage({
             <input className="input" name="analista" />
           </div>
           <div>
-            <label className="label">PDV solicitud</label>
-            <select className="input" name="pdv_solicitud_select" defaultValue="">
-              <option value="">— Selecciona un PDV —</option>
-              {pdvs?.map((p) => (
-                <option key={p.id} value={p.nombre}>{p.nombre}</option>
-              ))}
-            </select>
+            <label className="label">Capacitador</label>
+            <input className="input" name="capacitador" />
           </div>
         </div>
 
@@ -90,8 +85,13 @@ export default async function NuevoSeguimientoPage({
             <input className="input" name="aspirante_aprobado" />
           </div>
           <div>
-            <label className="label">Capacitador</label>
-            <input className="input" name="capacitador" />
+            <label className="label">PDV solicitud</label>
+            <select className="input" name="pdv_solicitud_select" defaultValue="">
+              <option value="">— Selecciona un PDV —</option>
+              {pdvs?.map((p) => (
+                <option key={p.id} value={p.nombre}>{p.nombre}</option>
+              ))}
+            </select>
           </div>
         </div>
 

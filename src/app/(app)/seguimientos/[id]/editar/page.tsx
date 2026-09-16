@@ -111,13 +111,8 @@ export default async function EditarSeguimientoPage({
             <input className="input" name="analista" defaultValue={seguimiento.analista ?? ""} />
           </div>
           <div>
-            <label className="label">PDV solicitud</label>
-            <select className="input" name="pdv_solicitud_select" defaultValue={pdvSelectDefault}>
-              <option value="">— Selecciona un PDV —</option>
-              {pdvs?.map((p) => (
-                <option key={p.id} value={p.nombre}>{p.nombre}</option>
-              ))}
-            </select>
+            <label className="label">Capacitador</label>
+            <input className="input" name="capacitador" defaultValue={seguimiento.capacitador ?? ""} />
           </div>
         </div>
 
@@ -131,8 +126,13 @@ export default async function EditarSeguimientoPage({
             />
           </div>
           <div>
-            <label className="label">Capacitador</label>
-            <input className="input" name="capacitador" defaultValue={seguimiento.capacitador ?? ""} />
+            <label className="label">PDV solicitud</label>
+            <select className="input" name="pdv_solicitud_select" defaultValue={pdvSelectDefault}>
+              <option value="">— Selecciona un PDV —</option>
+              {pdvs?.map((p) => (
+                <option key={p.id} value={p.nombre}>{p.nombre}</option>
+              ))}
+            </select>
           </div>
         </div>
 
