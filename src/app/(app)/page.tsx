@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireUser, tienePermiso } from "@/lib/auth";
 import StatCard from "@/components/StatCard";
 import { EstadoBadge } from "@/components/Badge";
+import CapacitacionesPieChart, { type SliceDatum } from "@/components/CapacitacionesPieChart";
 import Link from "next/link";
 import type { Escuela, Seguimiento } from "@/types/database";
 
@@ -44,18 +45,54 @@ async function cargarSeguimientosPermanencia(
   return data ?? [];
 }
 
+const MAX_ESCUELAS_GRAFICO = 7;
+
+// Capacitaciones (seguimientos) de los ultimos 30 dias, agrupadas por
+// escuela; las escuelas fuera del top 7 se agrupan en "Otras".
+async function cargarCapacitacionesPorEscuela(
+  supabase: ReturnType<typeof createClient>
+): Promise<SliceDatum[]> {
+  const hoy = new Date();
+  const hace30Dias = new Date(hoy);
+  hace30Dias.setDate(hoy.getDate() - 30);
+
+  const { data } = await supabase
+    .from("seguimientos")
+    .select("escuela_nombre_libre, escuelas(nombre)")
+    .gte("fecha_capacitacion", aFechaISO(hace30Dias))
+    .lte("fecha_capacitacion", aFechaISO(hoy))
+    .returns<{ escuela_nombre_libre: string | null; escuelas: { nombre: string } | null }[]>();
+
+  const conteos = new Map<string, number>();
+  for (const s of data ?? []) {
+    const nombre = s.escuelas?.nombre ?? s.escuela_nombre_libre ?? "Sin escuela";
+    conteos.set(nombre, (conteos.get(nombre) ?? 0) + 1);
+  }
+
+  const ordenado = [...conteos.entries()]
+    .map(([nombre, cantidad]) => ({ nombre, cantidad }))
+    .sort((a, b) => b.cantidad - a.cantidad);
+
+  if (ordenado.length <= MAX_ESCUELAS_GRAFICO) return ordenado;
+
+  const top = ordenado.slice(0, MAX_ESCUELAS_GRAFICO);
+  const resto = ordenado.slice(MAX_ESCUELAS_GRAFICO).reduce((acc, d) => acc + d.cantidad, 0);
+  return [...top, { nombre: "Otras", cantidad: resto }];
+}
+
 export default async function DashboardPage() {
   const { profile } = await requireUser();
   const supabase = createClient();
 
   const puedeVerSeguimientos = tienePermiso(profile, "seguimientos");
 
-  const [{ data: escuelas }, { count: seguimientosCount }, { count: entregasCount }, permanencia] =
+  const [{ data: escuelas }, { count: seguimientosCount }, { count: entregasCount }, permanencia, capacitacionesPorEscuela] =
     await Promise.all([
       supabase.from("escuelas").select("*").returns<Escuela[]>(),
       supabase.from("seguimientos").select("*", { count: "exact", head: true }),
       supabase.from("entregas").select("*", { count: "exact", head: true }),
       puedeVerSeguimientos ? cargarSeguimientosPermanencia(supabase) : Promise.resolve([]),
+      puedeVerSeguimientos ? cargarCapacitacionesPorEscuela(supabase) : Promise.resolve([]),
     ]);
 
   const total = escuelas?.length ?? 0;
@@ -91,6 +128,14 @@ export default async function DashboardPage() {
         <StatCard label="Entregas registradas" value={entregasCount ?? 0} />
         <StatCard label="Zonas cubiertas" value={zonas.size} />
       </div>
+
+      {puedeVerSeguimientos && (
+        <div className="card p-5">
+          <h2 className="font-semibold">Capacitaciones por escuela</h2>
+          <p className="text-xs text-neutral-400 mb-4">Últimos 30 días</p>
+          <CapacitacionesPieChart datos={capacitacionesPorEscuela} />
+        </div>
+      )}
 
       <div className="grid md:grid-cols-2 gap-6">
         <div className="card p-5">
