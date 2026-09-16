@@ -10,6 +10,7 @@ interface SeguimientosSearchParams {
   hasta?: string;
   cargo?: string;
   analista?: string;
+  estado_proceso?: string;
 }
 
 export default async function SeguimientosPage({
@@ -47,6 +48,9 @@ export default async function SeguimientosPage({
   if (searchParams.analista) {
     query = query.ilike("analista", `%${searchParams.analista}%`);
   }
+  if (searchParams.estado_proceso) {
+    query = query.eq("estado_proceso", searchParams.estado_proceso);
+  }
 
   const { data: seguimientos } = await query.returns<
     (Seguimiento & { escuelas: { nombre: string } | null })[]
@@ -57,7 +61,8 @@ export default async function SeguimientosPage({
     searchParams.desde ||
     searchParams.hasta ||
     searchParams.cargo ||
-    searchParams.analista;
+    searchParams.analista ||
+    searchParams.estado_proceso;
 
   return (
     <div className="space-y-4">
@@ -94,6 +99,14 @@ export default async function SeguimientosPage({
         <div>
           <label className="label">Analista</label>
           <input className="input" name="analista" placeholder="Nombre del analista" defaultValue={searchParams.analista ?? ""} />
+        </div>
+        <div>
+          <label className="label">Estado del proceso</label>
+          <select className="input" name="estado_proceso" defaultValue={searchParams.estado_proceso ?? ""}>
+            <option value="">Todos</option>
+            <option value="EN_PROCESO">En proceso</option>
+            <option value="FINALIZADO">Finalizado</option>
+          </select>
         </div>
         <div className="sm:col-span-2 lg:col-span-5 flex gap-2">
           <button type="submit" className="btn-secondary">Filtrar</button>

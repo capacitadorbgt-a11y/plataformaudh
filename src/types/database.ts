@@ -82,6 +82,8 @@ export interface AspiranteJson {
   aprobado: boolean;
 }
 
+export type EstadoProcesoSeguimiento = "EN_PROCESO" | "FINALIZADO";
+
 export interface Seguimiento {
   id: string;
   escuela_id: string | null;
@@ -90,6 +92,7 @@ export interface Seguimiento {
   num_aspirantes: number | null;
   aspirantes: AspiranteJson[];
   cargo: string | null;
+  estado_proceso: EstadoProcesoSeguimiento;
   num_ingreso: number | null;
   aspirante_aprobado: string | null;
   pdv_solicitud: string | null;

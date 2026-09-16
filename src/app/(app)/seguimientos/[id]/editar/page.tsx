@@ -87,6 +87,14 @@ export default async function EditarSeguimientoPage({
         </div>
 
         <div>
+          <label className="label">Estado del proceso</label>
+          <select className="input" name="estado_proceso" defaultValue={seguimiento.estado_proceso}>
+            <option value="EN_PROCESO">En proceso</option>
+            <option value="FINALIZADO">Finalizado</option>
+          </select>
+        </div>
+
+        <div>
           <label className="label">Aspirantes (uno por línea)</label>
           <textarea
             className="input"
