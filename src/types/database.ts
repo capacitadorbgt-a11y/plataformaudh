@@ -31,7 +31,20 @@ export interface Colaborador {
   escuela_id: string;
   nombre: string;
   rol: RolColaborador;
+  cedula: string | null;
   datos_bancarios: string | null;
+  fecha_ingreso: string | null;
+  created_at: string;
+}
+
+export interface Informe {
+  id: string;
+  escuela_id: string;
+  nombre_archivo: string;
+  tipo_archivo: string | null;
+  storage_path: string;
+  tamano_bytes: number | null;
+  created_by: string | null;
   created_at: string;
 }
 

@@ -70,8 +70,32 @@ export async function addColaborador(escuelaId: string, formData: FormData) {
     escuela_id: escuelaId,
     nombre: String(formData.get("nombre")),
     rol: String(formData.get("rol") || "OTRO"),
+    cedula: toNullableStr(formData.get("cedula")),
     datos_bancarios: toNullableStr(formData.get("datos_bancarios")),
+    fecha_ingreso: toNullableStr(formData.get("fecha_ingreso")),
   });
+
+  revalidatePath(`/escuelas/${escuelaId}`);
+}
+
+export async function updateColaborador(
+  escuelaId: string,
+  colaboradorId: string,
+  formData: FormData
+) {
+  await requireAdmin();
+  const supabase = createClient();
+
+  await supabase
+    .from("colaboradores")
+    .update({
+      nombre: String(formData.get("nombre")),
+      rol: String(formData.get("rol") || "OTRO"),
+      cedula: toNullableStr(formData.get("cedula")),
+      datos_bancarios: toNullableStr(formData.get("datos_bancarios")),
+      fecha_ingreso: toNullableStr(formData.get("fecha_ingreso")),
+    })
+    .eq("id", colaboradorId);
 
   revalidatePath(`/escuelas/${escuelaId}`);
 }
@@ -80,6 +104,61 @@ export async function deleteColaborador(escuelaId: string, colaboradorId: string
   await requireAdmin();
   const supabase = createClient();
   await supabase.from("colaboradores").delete().eq("id", colaboradorId);
+  revalidatePath(`/escuelas/${escuelaId}`);
+}
+
+const TIPOS_INFORME_PERMITIDOS = [
+  "application/pdf",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+];
+
+export async function uploadInforme(escuelaId: string, formData: FormData) {
+  const { user } = await requireUser();
+  const supabase = createClient();
+
+  const archivo = formData.get("archivo");
+  if (!(archivo instanceof File) || archivo.size === 0) {
+    redirect(`/escuelas/${escuelaId}?error=${encodeURIComponent("Selecciona un archivo para subir")}`);
+  }
+
+  const file = archivo as File;
+  if (TIPOS_INFORME_PERMITIDOS.length && file.type && !TIPOS_INFORME_PERMITIDOS.includes(file.type)) {
+    redirect(
+      `/escuelas/${escuelaId}?error=${encodeURIComponent(
+        "Tipo de archivo no permitido. Sube un PDF, Word (doc/docx) o Excel (xls/xlsx)."
+      )}`
+    );
+  }
+
+  const rutaStorage = `${escuelaId}/${Date.now()}-${file.name}`;
+  const { error: uploadError } = await supabase.storage.from("informes").upload(rutaStorage, file);
+
+  if (uploadError) {
+    redirect(`/escuelas/${escuelaId}?error=${encodeURIComponent(uploadError.message)}`);
+  }
+
+  await supabase.from("informes").insert({
+    escuela_id: escuelaId,
+    nombre_archivo: file.name,
+    tipo_archivo: file.type || null,
+    storage_path: rutaStorage,
+    tamano_bytes: file.size,
+    created_by: user.id,
+  });
+
+  revalidatePath(`/escuelas/${escuelaId}`);
+}
+
+export async function deleteInforme(escuelaId: string, informeId: string, storagePath: string) {
+  await requireAdmin();
+  const supabase = createClient();
+
+  await supabase.storage.from("informes").remove([storagePath]);
+  await supabase.from("informes").delete().eq("id", informeId);
+
   revalidatePath(`/escuelas/${escuelaId}`);
 }
 

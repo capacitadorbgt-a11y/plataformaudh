@@ -1,11 +1,33 @@
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth";
 import { notFound } from "next/navigation";
+import Link from "next/link";
 import { EstadoBadge, RolBadge } from "@/components/Badge";
-import { updateEscuela, addColaborador, deleteColaborador, addEntrega } from "../actions";
-import type { Colaborador, Entrega, Escuela, Seguimiento } from "@/types/database";
+import {
+  updateEscuela,
+  addColaborador,
+  updateColaborador,
+  deleteColaborador,
+  addEntrega,
+  uploadInforme,
+  deleteInforme,
+} from "../actions";
+import type { Colaborador, Entrega, Escuela, Informe, Seguimiento } from "@/types/database";
 
-export default async function EscuelaDetailPage({ params }: { params: { id: string } }) {
+function formatBytes(bytes: number | null) {
+  if (!bytes) return "";
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+export default async function EscuelaDetailPage({
+  params,
+  searchParams,
+}: {
+  params: { id: string };
+  searchParams: { error?: string };
+}) {
   const { profile } = await requireUser();
   const supabase = createClient();
 
@@ -19,7 +41,7 @@ export default async function EscuelaDetailPage({ params }: { params: { id: stri
 
   const isAdmin = profile.role === "admin_udh";
 
-  const [{ data: colaboradores }, { data: entregas }, { data: seguimientos }] =
+  const [{ data: colaboradores }, { data: entregas }, { data: seguimientos }, { data: informes }] =
     await Promise.all([
       supabase
         .from(isAdmin ? "colaboradores" : "colaboradores_view")
@@ -38,12 +60,29 @@ export default async function EscuelaDetailPage({ params }: { params: { id: stri
         .eq("escuela_id", params.id)
         .order("fecha_capacitacion", { ascending: false })
         .returns<Seguimiento[]>(),
+      supabase
+        .from("informes")
+        .select("*")
+        .eq("escuela_id", params.id)
+        .order("created_at", { ascending: false })
+        .returns<Informe[]>(),
     ]);
+
+  const informesConUrl = await Promise.all(
+    (informes ?? []).map(async (inf) => {
+      const { data } = await supabase.storage
+        .from("informes")
+        .createSignedUrl(inf.storage_path, 3600);
+      return { ...inf, url: data?.signedUrl ?? null };
+    })
+  );
 
   const boundUpdate = updateEscuela.bind(null, escuela.id);
   const boundAddColaborador = addColaborador.bind(null, escuela.id);
   const boundDeleteColaborador = deleteColaborador.bind(null, escuela.id);
   const boundAddEntrega = addEntrega.bind(null, escuela.id);
+  const boundUploadInforme = uploadInforme.bind(null, escuela.id);
+  const boundDeleteInforme = deleteInforme.bind(null, escuela.id);
 
   return (
     <div className="space-y-6">
@@ -56,6 +95,12 @@ export default async function EscuelaDetailPage({ params }: { params: { id: stri
         </div>
         <EstadoBadge estado={escuela.estado} />
       </div>
+
+      {searchParams?.error && (
+        <div className="card p-4 border-red-200 bg-red-50 text-sm text-red-600">
+          {searchParams.error}
+        </div>
+      )}
 
       {/* Ficha de la escuela */}
       <div className="card p-6">
@@ -119,29 +164,74 @@ export default async function EscuelaDetailPage({ params }: { params: { id: stri
           <h2 className="font-semibold">Colaboradores (Admin / Polifuncional)</h2>
           {!isAdmin && (
             <span className="text-xs text-neutral-400">
-              Datos bancarios visibles solo para Admin UDH
+              Cédula y datos bancarios visibles solo para Admin UDH
             </span>
           )}
         </div>
 
-        <div className="space-y-2 mb-4">
-          {colaboradores?.map((c) => (
-            <div key={c.id} className="flex items-center justify-between border border-neutral-100 rounded-lg px-3 py-2">
-              <div>
+        <div className="space-y-3 mb-4">
+          {colaboradores?.map((c) =>
+            isAdmin ? (
+              <form
+                key={c.id}
+                action={updateColaborador.bind(null, escuela.id, c.id)}
+                className="border border-neutral-100 rounded-lg p-3 grid sm:grid-cols-5 gap-3 items-end"
+              >
+                <div className="sm:col-span-2">
+                  <label className="label">Nombre</label>
+                  <input className="input" name="nombre" defaultValue={c.nombre} required />
+                </div>
+                <div>
+                  <label className="label">Rol</label>
+                  <select className="input" name="rol" defaultValue={c.rol}>
+                    <option value="ADMIN">ADMIN</option>
+                    <option value="POLI">POLI</option>
+                    <option value="OTRO">OTRO</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="label">Cédula</label>
+                  <input className="input" name="cedula" defaultValue={c.cedula ?? ""} />
+                </div>
+                <div>
+                  <label className="label">Fecha de ingreso</label>
+                  <input
+                    className="input"
+                    type="date"
+                    name="fecha_ingreso"
+                    defaultValue={c.fecha_ingreso ?? ""}
+                  />
+                </div>
+                <div className="sm:col-span-4">
+                  <label className="label">Datos bancarios (banco, cuenta)</label>
+                  <input className="input" name="datos_bancarios" defaultValue={c.datos_bancarios ?? ""} />
+                </div>
+                <div className="flex gap-2">
+                  <button type="submit" className="btn-secondary w-full">Guardar</button>
+                </div>
+                <div className="sm:col-span-5 flex justify-between items-center pt-1">
+                  <RolBadge rol={c.rol} />
+                  <button
+                    type="submit"
+                    formAction={boundDeleteColaborador.bind(null, c.id)}
+                    className="text-xs text-red-500 hover:underline"
+                  >
+                    Eliminar
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <div key={c.id} className="border border-neutral-100 rounded-lg px-3 py-2">
                 <div className="text-sm font-medium flex items-center gap-2">
                   {c.nombre} <RolBadge rol={c.rol} />
                 </div>
-                <div className="text-xs text-neutral-400">{c.datos_bancarios || "—"}</div>
+                <div className="text-xs text-neutral-400">
+                  {c.fecha_ingreso ? `Ingreso: ${c.fecha_ingreso} · ` : ""}
+                  {c.datos_bancarios || "—"}
+                </div>
               </div>
-              {isAdmin && (
-                <form action={boundDeleteColaborador.bind(null, c.id)}>
-                  <button type="submit" className="text-xs text-red-500 hover:underline">
-                    Eliminar
-                  </button>
-                </form>
-              )}
-            </div>
-          ))}
+            )
+          )}
           {(!colaboradores || colaboradores.length === 0) && (
             <p className="text-sm text-neutral-400">Sin colaboradores registrados.</p>
           )}
@@ -162,14 +252,76 @@ export default async function EscuelaDetailPage({ params }: { params: { id: stri
               </select>
             </div>
             <div>
-              <button type="submit" className="btn-secondary w-full">Agregar</button>
+              <label className="label">Cédula</label>
+              <input className="input" name="cedula" />
             </div>
-            <div className="sm:col-span-4">
-              <label className="label">Datos bancarios (cédula, banco, cuenta)</label>
+            <div>
+              <label className="label">Fecha de ingreso</label>
+              <input className="input" type="date" name="fecha_ingreso" />
+            </div>
+            <div className="sm:col-span-2">
+              <label className="label">Datos bancarios (banco, cuenta)</label>
               <input className="input" name="datos_bancarios" />
+            </div>
+            <div>
+              <button type="submit" className="btn-secondary w-full">+ Agregar colaborador</button>
             </div>
           </form>
         )}
+      </div>
+
+      {/* Informes */}
+      <div className="card p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="font-semibold">Informes</h2>
+        </div>
+
+        <div className="space-y-2 mb-4">
+          {informesConUrl.map((inf) => (
+            <div key={inf.id} className="flex items-center justify-between border border-neutral-100 rounded-lg px-3 py-2 text-sm">
+              <div className="min-w-0">
+                {inf.url ? (
+                  <a href={inf.url} target="_blank" rel="noreferrer" className="font-medium hover:underline text-udh-700 truncate block">
+                    {inf.nombre_archivo}
+                  </a>
+                ) : (
+                  <span className="font-medium">{inf.nombre_archivo}</span>
+                )}
+                <div className="text-xs text-neutral-400">
+                  {formatBytes(inf.tamano_bytes)} · {new Date(inf.created_at).toLocaleDateString("es-EC")}
+                </div>
+              </div>
+              {isAdmin && (
+                <form action={boundDeleteInforme.bind(null, inf.id, inf.storage_path)}>
+                  <button type="submit" className="text-xs text-red-500 hover:underline shrink-0">
+                    Eliminar
+                  </button>
+                </form>
+              )}
+            </div>
+          ))}
+          {informesConUrl.length === 0 && (
+            <p className="text-sm text-neutral-400">Sin informes cargados.</p>
+          )}
+        </div>
+
+        <form
+          action={boundUploadInforme}
+          encType="multipart/form-data"
+          className="flex flex-wrap gap-3 items-end border-t border-neutral-100 pt-4"
+        >
+          <div className="flex-1 min-w-[220px]">
+            <label className="label">Archivo (PDF, Word o Excel)</label>
+            <input
+              className="input"
+              type="file"
+              name="archivo"
+              accept=".pdf,.doc,.docx,.xls,.xlsx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+              required
+            />
+          </div>
+          <button type="submit" className="btn-primary">+ Agregar informe</button>
+        </form>
       </div>
 
       {/* Entregas / recompensas */}
@@ -224,7 +376,11 @@ export default async function EscuelaDetailPage({ params }: { params: { id: stri
         <h2 className="font-semibold mb-4">Seguimientos de reclutamiento / capacitación</h2>
         <div className="space-y-2">
           {seguimientos?.map((s) => (
-            <div key={s.id} className="border border-neutral-100 rounded-lg px-3 py-2 text-sm">
+            <Link
+              key={s.id}
+              href={`/seguimientos/${s.id}/editar`}
+              className="block border border-neutral-100 rounded-lg px-3 py-2 text-sm hover:bg-neutral-50 hover:underline underline-offset-2"
+            >
               <div className="flex justify-between">
                 <span className="font-medium">{s.cargo || "Sin cargo"}</span>
                 <span className="text-xs text-neutral-400">{s.fecha_capacitacion}</span>
@@ -232,10 +388,13 @@ export default async function EscuelaDetailPage({ params }: { params: { id: stri
               <div className="text-xs text-neutral-500">
                 Aspirantes: {s.num_aspirantes ?? 0} · Aprobado: {s.aspirante_aprobado || "—"}
               </div>
+              <div className="text-xs text-neutral-500">
+                PDV que solicita: {s.pdv_solicitud || "—"}
+              </div>
               {s.observaciones && (
                 <div className="text-xs text-neutral-400 mt-1">{s.observaciones}</div>
               )}
-            </div>
+            </Link>
           ))}
           {(!seguimientos || seguimientos.length === 0) && (
             <p className="text-sm text-neutral-400">Sin seguimientos registrados para esta escuela.</p>
