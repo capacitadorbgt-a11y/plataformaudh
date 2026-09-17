@@ -189,14 +189,12 @@ export default function EncuestaForm({
 
         <div>
           <label className="label">Califique del 1 al 10 la limpieza y organización del PDV en primera impresión</label>
-          <input
-            className="input"
-            type="number"
-            min={1}
-            max={10}
-            name="limpieza_organizacion"
-            defaultValue={encuesta?.limpieza_organizacion ?? ""}
-          />
+          <select className="input" name="limpieza_organizacion" defaultValue={encuesta?.limpieza_organizacion ?? ""}>
+            <option value="">— Selecciona —</option>
+            {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => (
+              <option key={n} value={n}>{n}</option>
+            ))}
+          </select>
         </div>
 
         <div>
@@ -205,13 +203,20 @@ export default function EncuestaForm({
         </div>
 
         <div>
-          <label className="label">¿Considera que el tiempo dedicado a cada tema fue suficiente para comprenderlo?</label>
-          <select className="input" name="tiempo_suficiente" defaultValue={encuesta?.tiempo_suficiente ?? ""}>
-            <option value="">— Selecciona —</option>
-            <option value="Si">Si</option>
-            <option value="Parcialmente">Parcialmente</option>
-            <option value="No">No</option>
-          </select>
+          <label className="label mb-1">¿Considera que el tiempo dedicado a cada tema fue suficiente para comprenderlo?</label>
+          <div className="flex flex-wrap gap-4">
+            {["Si", "Parcialmente", "No"].map((op) => (
+              <label key={op} className="flex items-center gap-2 text-sm">
+                <input
+                  type="radio"
+                  name="tiempo_suficiente"
+                  value={op}
+                  defaultChecked={encuesta?.tiempo_suficiente === op}
+                />
+                {op}
+              </label>
+            ))}
+          </div>
         </div>
 
         <div>
@@ -233,7 +238,12 @@ export default function EncuestaForm({
           <label className="label">
             NPS — En una escala del 1 al 10, ¿qué calificación general le daría a la capacitación recibida?
           </label>
-          <input className="input" type="number" min={1} max={10} name="nps" defaultValue={encuesta?.nps ?? ""} />
+          <select className="input" name="nps" defaultValue={encuesta?.nps ?? ""}>
+            <option value="">— Selecciona —</option>
+            {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => (
+              <option key={n} value={n}>{n}</option>
+            ))}
+          </select>
         </div>
       </div>
 
@@ -300,13 +310,19 @@ export default function EncuestaForm({
                 ¿Al finalizar la capacitación, los temas que vio le sirvieron para desempeñar correctamente sus
                 funciones en el punto de venta?
               </label>
-              <select className="input" name="desempeno_funciones" defaultValue={encuesta?.desempeno_funciones ?? ""}>
-                <option value="">— Selecciona —</option>
-                <option value="Sí, completamente">Sí, completamente</option>
-                <option value="Sí, en su mayoría">Sí, en su mayoría</option>
-                <option value="Parcialmente">Parcialmente</option>
-                <option value="No">No</option>
-              </select>
+              <div className="flex flex-col gap-2">
+                {["Sí, completamente", "Sí, en su mayoría", "Parcialmente", "No"].map((op) => (
+                  <label key={op} className="flex items-center gap-2 text-sm">
+                    <input
+                      type="radio"
+                      name="desempeno_funciones"
+                      value={op}
+                      defaultChecked={encuesta?.desempeno_funciones === op}
+                    />
+                    {op}
+                  </label>
+                ))}
+              </div>
             </div>
             <div>
               <label className="label">Observaciones adicionales</label>
@@ -325,17 +341,20 @@ export default function EncuestaForm({
             <h3 className="text-sm font-semibold text-neutral-600">Desertores</h3>
             <div>
               <label className="label">¿Cuál fue el principal motivo por el que no pudo finalizar la capacitación?</label>
-              <select
-                className="input"
-                name="motivo_no_finalizo"
-                value={motivo}
-                onChange={(e) => setMotivo(e.target.value)}
-              >
-                <option value="">— Selecciona —</option>
+              <div className="flex flex-col gap-2">
                 {MOTIVOS_DESERCION.map((m) => (
-                  <option key={m} value={m}>{m}</option>
+                  <label key={m} className="flex items-center gap-2 text-sm">
+                    <input
+                      type="radio"
+                      name="motivo_no_finalizo"
+                      value={m}
+                      checked={motivo === m}
+                      onChange={() => setMotivo(m)}
+                    />
+                    {m}
+                  </label>
                 ))}
-              </select>
+              </div>
               {motivo === "Otro" && (
                 <input
                   className="input mt-2"
