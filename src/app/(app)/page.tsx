@@ -3,6 +3,7 @@ import { requireUser, tienePermiso } from "@/lib/auth";
 import StatCard from "@/components/StatCard";
 import { EstadoBadge } from "@/components/Badge";
 import CapacitacionesPieChart, { type SliceDatum } from "@/components/CapacitacionesPieChart";
+import BuscadorEscuelaCercana from "@/components/BuscadorEscuelaCercana";
 import Link from "next/link";
 import type { Escuela, Seguimiento } from "@/types/database";
 
@@ -119,6 +120,7 @@ export default async function DashboardPage() {
   const supabase = createClient();
 
   const puedeVerSeguimientos = tienePermiso(profile, "seguimientos");
+  const puedeVerEscuelas = tienePermiso(profile, "escuelas");
 
   const [
     { data: escuelas },
@@ -127,6 +129,7 @@ export default async function DashboardPage() {
     permanencia,
     capacitacionesPorEscuela,
     enProcesoVencidos,
+    { data: pdvs },
   ] = await Promise.all([
     supabase.from("escuelas").select("*").returns<Escuela[]>(),
     supabase.from("seguimientos").select("*", { count: "exact", head: true }),
@@ -134,6 +137,11 @@ export default async function DashboardPage() {
     puedeVerSeguimientos ? cargarSeguimientosPermanencia(supabase) : Promise.resolve([]),
     puedeVerSeguimientos ? cargarCapacitacionesPorEscuela(supabase) : Promise.resolve([]),
     puedeVerSeguimientos ? cargarSeguimientosEnProcesoVencidos(supabase) : Promise.resolve([]),
+    puedeVerEscuelas
+      ? supabase.from("pdvs").select("nombre, ciudad, provincia").order("nombre").returns<
+          { nombre: string; ciudad: string | null; provincia: string | null }[]
+        >()
+      : Promise.resolve({ data: [] as { nombre: string; ciudad: string | null; provincia: string | null }[] }),
   ]);
 
   const total = escuelas?.length ?? 0;
@@ -159,6 +167,19 @@ export default async function DashboardPage() {
           Estado nacional de las escuelas de formación
         </p>
       </div>
+
+      {puedeVerEscuelas && (
+        <BuscadorEscuelaCercana
+          pdvs={pdvs ?? []}
+          escuelas={(escuelas ?? []).map((e) => ({
+            id: e.id,
+            nombre: e.nombre,
+            ciudad: e.ciudad,
+            provincia: e.provincia,
+            estado: e.estado,
+          }))}
+        />
+      )}
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <StatCard label="Escuelas totales" value={total} />
