@@ -25,15 +25,6 @@ export default function GenerarInformeDiagnostico({ escuela }: { escuela: Escuel
         const datos = await parseInformeExcel(archivo);
         const { blob, nombreArchivo } = await generarInformePDF({ escuela, datos });
 
-        const enlace = document.createElement("a");
-        const url = URL.createObjectURL(blob);
-        enlace.href = url;
-        enlace.download = nombreArchivo;
-        document.body.appendChild(enlace);
-        enlace.click();
-        enlace.remove();
-        URL.revokeObjectURL(url);
-
         const formData = new FormData();
         formData.set("archivo", new File([blob], nombreArchivo, { type: "application/pdf" }));
         const resultadoSubida = await uploadInforme(escuela.id, formData);
@@ -83,7 +74,7 @@ export default function GenerarInformeDiagnostico({ escuela }: { escuela: Escuel
 
       {showModal && (
         <Modal title="Informe generado" onClose={goToEscuelas}>
-          El informe en PDF se descargó y también quedó guardado en la lista de Informes.
+          El informe en PDF quedó guardado en la lista de Informes de esta escuela; ábrelo desde ahí para verlo o descargarlo.
           {mensajeEstado && <p className="mt-2 font-medium">{mensajeEstado}</p>}
         </Modal>
       )}
