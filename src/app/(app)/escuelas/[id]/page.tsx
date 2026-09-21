@@ -8,6 +8,7 @@ import ColaboradorEditForm from "@/components/ColaboradorEditForm";
 import ColaboradorAddForm from "@/components/ColaboradorAddForm";
 import EntregaAddForm from "@/components/EntregaAddForm";
 import InformeUploadForm from "@/components/InformeUploadForm";
+import GenerarInformeDiagnostico from "@/components/GenerarInformeDiagnostico";
 import { deleteInforme } from "../actions";
 import type { Colaborador, Entrega, Escuela, Informe, Seguimiento } from "@/types/database";
 
@@ -140,6 +141,8 @@ export default async function EscuelaDetailPage({
         <div className="flex items-center justify-between mb-4">
           <h2 className="font-semibold">Informes</h2>
         </div>
+
+        <GenerarInformeDiagnostico escuela={escuela} />
 
         <div className="space-y-2 mb-4">
           {informesConUrl.map((inf) => (
