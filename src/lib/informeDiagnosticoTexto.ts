@@ -16,7 +16,7 @@ export function textoObjetivoGeneral(fechaVisita: string | null, fechaRespaldo: 
 export function textoCriteriosInterpretacion(): string[] {
   return [
     "Los resultados de la evaluación diagnóstica y del plan de trabajo se interpretan de acuerdo con la siguiente marcación:",
-    "• X — Cumple: el criterio evaluado se satisface conforme al estándar establecido por la Universidad del Helado.",
+    "• X / ✓ — Cumple: el criterio evaluado se satisface conforme al estándar establecido por la Universidad del Helado.",
     "• – (guion) — No cumple: el criterio evaluado no se satisface y requiere una acción correctiva.",
     "• En blanco — No evaluado (evaluación diagnóstica) o No se realizó (plan de trabajo): el criterio no fue calificado durante la visita.",
   ];
@@ -44,17 +44,17 @@ export function textoConclusiones(datos: DatosInformeDiagnostico, nombreEscuela:
 
   if (totalCriterios > 0) {
     frases.push(
-      `De los ${totalCriterios} criterios evaluados en la visita diagnóstica a ${nombreEscuela}, ${cumplenCriterios} se cumplen ` +
-        `conforme al estándar de la Universidad del Helado${noCumplenCriterios > 0 ? ` y ${noCumplenCriterios} presentan incumplimiento` : ""}.`
+      `Se determina que, de los ${totalCriterios} criterios evaluados en la visita diagnóstica a ${nombreEscuela}, ${cumplenCriterios} ` +
+        `se cumplen conforme al estándar de la Universidad del Helado${noCumplenCriterios > 0 ? ` y ${noCumplenCriterios} presentan incumplimiento` : ""}.`
     );
   }
 
   if (totalActividades > 0) {
     if (noCumplenActividades === 0 && noRealizadas === 0) {
-      frases.push("Las actividades del plan de trabajo fueron ejecutadas y cumplidas en su totalidad.");
+      frases.push("Se evidencia que las actividades del plan de trabajo fueron ejecutadas y cumplidas en su totalidad.");
     } else {
       frases.push(
-        `Del plan de trabajo, ${noCumplenActividades} actividad(es) no cumplen el estándar esperado y ${noRealizadas} ` +
+        `Se evidencia que, del plan de trabajo, ${noCumplenActividades} actividad(es) no cumplen el estándar esperado y ${noRealizadas} ` +
           "no fueron ejecutadas al momento de la visita."
       );
     }
@@ -62,12 +62,12 @@ export function textoConclusiones(datos: DatosInformeDiagnostico, nombreEscuela:
 
   if (noCumplenCriterios === 0 && noCumplenActividades === 0) {
     frases.push(
-      `En conjunto, ${nombreEscuela} evidencia un desempeño satisfactorio y cumple con los parámetros ` +
-        "requeridos para mantener su condición de Escuela de Formación."
+      `Se concluye que ${nombreEscuela} evidencia un desempeño satisfactorio y cumple con los parámetros requeridos ` +
+        "para mantener su condición de Escuela de Formación."
     );
   } else {
     frases.push(
-      `En conjunto, ${nombreEscuela} requiere atender los puntos señalados en este informe para asegurar el ` +
+      `Se concluye que ${nombreEscuela} requiere atender los puntos señalados en este informe para asegurar el ` +
         "cumplimiento pleno de los estándares operativos y de equipo humano exigidos a una Escuela de Formación."
     );
   }
@@ -86,10 +86,11 @@ export function textoRecomendaciones(datos: DatosInformeDiagnostico): string[] {
   }
 
   for (const actividad of actividadesPendientes) {
-    const base = `Dar seguimiento a la actividad "${actividad.actividad}" del plan de trabajo`;
-    recomendaciones.push(
-      actividad.observaciones ? `${base}, considerando lo observado: ${actividad.observaciones}.` : `${base}.`
-    );
+    recomendaciones.push(`Dar seguimiento a la actividad "${actividad.actividad}" del plan de trabajo hasta completar su cumplimiento.`);
+  }
+
+  if (datos.observacionesPlan) {
+    recomendaciones.push(`Atender las observaciones registradas por el evaluador durante la visita: ${datos.observacionesPlan}`);
   }
 
   if (recomendaciones.length === 0) {

@@ -1,6 +1,7 @@
 import type { Escuela } from "@/types/database";
 import type { CriterioDiagnostico, DatosInformeDiagnostico, EstadoActividad, EstadoCriterio } from "@/lib/informeDiagnosticoDatos";
 import {
+  actividadesNoCumplen,
   criteriosNoCumplen,
   textoConclusiones,
   textoCriteriosInterpretacion,
@@ -229,32 +230,41 @@ export async function generarInformePDF(params: {
     });
   }
 
+  const hayDias = datos.actividadesPlan.some((a) => a.dia);
   if (datos.actividadesPlan.length > 0) {
     escribirParrafo("Detalle del plan de trabajo:", { negrita: true });
     tablaEstandar({
-      head: [["Actividad", "Cumplimiento", "Observaciones"]],
+      head: [hayDias ? ["Día", "Actividad", "Cumplimiento"] : ["Actividad", "Cumplimiento"]],
       body: datos.actividadesPlan.map((a) => {
         const estadoTexto = estadoActividadTexto(a.estado);
-        return [
-          a.actividad,
-          { content: estadoTexto, textColor: estadoColor(estadoTexto) },
-          a.observaciones || "—",
-        ];
+        const fila = hayDias ? [a.dia || "—", a.actividad] : [a.actividad];
+        return [...fila, { content: estadoTexto, textColor: estadoColor(estadoTexto) }];
       }),
     });
   }
 
   // 4. Observaciones de la visita vs. acciones realizadas
+  // Se arma con las mismas actividades de la sección 3 (solo las pendientes o
+  // no cumplidas) y aquí -y solo aquí- se incluyen las observaciones registradas.
   dibujarBarraSeccion("4.", "Observaciones de la visita vs. Acciones realizadas");
-  const conObservaciones = datos.actividadesPlan.filter((a) => a.observaciones);
-  if (conObservaciones.length > 0) {
+  const pendientes = actividadesNoCumplen(datos.actividadesPlan);
+  if (pendientes.length > 0) {
+    escribirParrafo("Actividades del plan de trabajo pendientes o no cumplidas al momento de la visita:", { negrita: true });
     tablaEstandar({
-      head: [["Actividad", "Observación de la visita / Acción realizada"]],
-      body: conObservaciones.map((a) => [a.actividad, a.observaciones]),
+      head: [hayDias ? ["Día", "Actividad", "Estado"] : ["Actividad", "Estado"]],
+      body: pendientes.map((a) => {
+        const estadoTexto = estadoActividadTexto(a.estado);
+        const fila = hayDias ? [a.dia || "—", a.actividad] : [a.actividad];
+        return [...fila, { content: estadoTexto, textColor: estadoColor(estadoTexto) }];
+      }),
     });
   } else {
-    escribirParrafo("No se registraron observaciones adicionales en el plan de trabajo.", { fondo: BLUE_GRAY });
+    escribirParrafo("Todas las actividades del plan de trabajo se cumplieron al momento de la visita.", { fondo: PEACH });
   }
+  escribirParrafo("Observaciones de la visita y acciones realizadas registradas por el evaluador:", { negrita: true });
+  escribirParrafo(datos.observacionesPlan || "No se registraron observaciones adicionales en el plan de trabajo.", {
+    fondo: BLUE_GRAY,
+  });
 
   // 5. Conclusiones
   dibujarBarraSeccion("5.", "Conclusiones");
@@ -295,9 +305,11 @@ export async function generarInformePDF(params: {
       doc.setFont("Poppins", "normal");
       doc.setFontSize(8);
       doc.setTextColor(120, 120, 120);
-      filaFotos.forEach((_, indice) => {
+      filaFotos.forEach((foto, indice) => {
         const x = MARGIN + indice * (anchoImagen + gap);
-        doc.text(`Fotografía ${i + indice + 1}`, x, y + filaAltoMax + 4);
+        const etiqueta = foto.descripcion || `Evidencia fotográfica ${i + indice + 1}`;
+        const lineas = doc.splitTextToSize(etiqueta, anchoImagen) as string[];
+        doc.text(lineas, x, y + filaAltoMax + 4);
       });
       doc.setTextColor(...DARK_TEXT);
 

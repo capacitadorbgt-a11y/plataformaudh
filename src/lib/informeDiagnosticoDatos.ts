@@ -17,20 +17,22 @@ export interface CriterioDiagnostico {
 }
 
 export interface ActividadPlan {
+  dia: string;
   actividad: string;
   estado: EstadoActividad;
-  observaciones: string;
 }
 
 export interface FotoInforme {
   nombre: string;
   dataUrl: string;
+  descripcion: string | null;
 }
 
 export interface DatosInformeDiagnostico {
   fechaVisita: string | null;
   criteriosDiagnostico: CriterioDiagnostico[];
   actividadesPlan: ActividadPlan[];
+  observacionesPlan: string | null;
   fotos: FotoInforme[];
 }
 
@@ -44,12 +46,16 @@ function normalizar(valor: unknown): string {
 
 function esMarcaCumple(valor: string) {
   const n = normalizar(valor);
-  return n === "X" || n === "SI" || n === "OK";
+  return n === "X" || n === "/" || n === "✓" || n === "SI" || n === "OK";
 }
 
 function esMarcaNoCumple(valor: string) {
   const n = normalizar(valor);
   return n === "-" || n === "–" || n === "—" || n === "NO";
+}
+
+function esMarcaReconocida(valor: string) {
+  return valor.trim() === "" || esMarcaCumple(valor) || esMarcaNoCumple(valor);
 }
 
 function hojaComoMatriz(workbook: XLSX.WorkBook, nombreHoja: string): unknown[][] {
@@ -74,7 +80,7 @@ function extraerDiagnostico(workbook: XLSX.WorkBook): CriterioDiagnostico[] {
     const candidatas: { indice: number; etiqueta: string }[] = [];
     for (let c = 2; c < fila.length; c++) {
       const texto = normalizar(fila[c]);
-      if (texto.includes("ADMIN") || texto.includes("POLI") || texto.includes("COLABORADOR")) {
+      if (texto.includes("ADM") || texto.includes("POLI") || texto.includes("COLABORADOR")) {
         candidatas.push({ indice: c, etiqueta: String(fila[c]).trim() });
       }
     }
@@ -88,21 +94,46 @@ function extraerDiagnostico(workbook: XLSX.WorkBook): CriterioDiagnostico[] {
     columnas = [2, 3, 4, 5].map((indice, i) => ({ indice, etiqueta: `Colaborador ${i + 1}` }));
   }
 
+  // Justo debajo del encabezado de roles (ADMI/POLI/POLI/POLI) suele venir una
+  // fila con el nombre real de cada colaborador en esas mismas columnas.
+  let inicioDatos = filaEncabezado + 1;
+  const filaNombres = filas[inicioDatos];
+  if (filaNombres) {
+    const colA = String(filaNombres[0] ?? "").trim();
+    const colB = String(filaNombres[1] ?? "").trim();
+    const nombresEncontrados = columnas.map((col) => String(filaNombres[col.indice] ?? "").trim());
+    const hayNombre = nombresEncontrados.some((v) => v !== "" && !esMarcaReconocida(v));
+    if (!colA && !colB && hayNombre) {
+      columnas = columnas.map((col, idx) => {
+        const nombre = nombresEncontrados[idx];
+        if (!nombre || esMarcaReconocida(nombre)) return col;
+        const primerNombre = nombre.split(/\s+/)[0];
+        return { ...col, etiqueta: `${col.etiqueta} (${primerNombre})` };
+      });
+      inicioDatos++;
+    }
+  }
+
   const criterios: CriterioDiagnostico[] = [];
   let categoriaActual = "General";
 
-  for (let i = filaEncabezado + 1; i < filas.length; i++) {
+  for (let i = inicioDatos; i < filas.length; i++) {
     const fila = filas[i];
     const colA = String(fila[0] ?? "").trim();
     const colB = String(fila[1] ?? "").trim();
-
-    if (colA) categoriaActual = colA;
-    if (!colB) continue;
+    if (!colA && !colB) continue;
 
     const marcas: MarcaColaborador[] = columnas.map((col) => ({
       etiqueta: col.etiqueta,
       valor: String(fila[col.indice] ?? "").trim(),
     }));
+    const hayMarcas = marcas.some((m) => m.valor !== "");
+
+    if (!colA && !hayMarcas && colB) {
+      categoriaActual = colB;
+      continue;
+    }
+    if (!colB) continue;
 
     const algunaNoCumple = marcas.some((m) => esMarcaNoCumple(m.valor));
     const algunaCumple = marcas.some((m) => esMarcaCumple(m.valor));
@@ -114,46 +145,59 @@ function extraerDiagnostico(workbook: XLSX.WorkBook): CriterioDiagnostico[] {
   return criterios;
 }
 
-function extraerPlan(workbook: XLSX.WorkBook): ActividadPlan[] {
-  const nombreHoja = buscarHoja(workbook, /^PLAN|PLAN DE TRABAJO|PLAN\b/);
-  if (!nombreHoja) return [];
+function extraerPlan(workbook: XLSX.WorkBook): { actividades: ActividadPlan[]; observaciones: string | null } {
+  const nombreHoja = buscarHoja(workbook, /PLAN/);
+  if (!nombreHoja) return { actividades: [], observaciones: null };
   const filas = hojaComoMatriz(workbook, nombreHoja);
 
-  let filaEncabezado = -1;
-  let colObservaciones = -1;
+  let inicio = -1;
   for (let i = 0; i < filas.length; i++) {
-    const fila = filas[i];
-    const textoA = normalizar(fila[0]);
-    const textoB = normalizar(fila[1]);
-    if (textoA.includes("ACTIVID") || textoB.includes("CUMPL")) {
-      filaEncabezado = i;
-      for (let c = 0; c < fila.length; c++) {
-        if (normalizar(fila[c]).includes("OBSERV")) colObservaciones = c;
-      }
-      if (colObservaciones === -1) colObservaciones = fila.length - 1;
+    const textoA = normalizar(filas[i][0]);
+    const textoB = normalizar(filas[i][1]);
+    if (textoA.includes("ACTIVID") || textoB.includes("CUMPL") || /^D[IÍ]A\s*\d/.test(textoA)) {
+      inicio = textoA.includes("ACTIVID") || textoB.includes("CUMPL") ? i + 1 : i;
       break;
     }
   }
-  if (filaEncabezado === -1) return [];
+  if (inicio === -1) return { actividades: [], observaciones: null };
 
   const actividades: ActividadPlan[] = [];
-  for (let i = filaEncabezado + 1; i < filas.length; i++) {
+  const observacionesLineas: string[] = [];
+  let diaActual = "";
+  let dentroDeObservaciones = false;
+
+  for (let i = inicio; i < filas.length; i++) {
     const fila = filas[i];
-    const actividad = String(fila[0] ?? "").trim();
-    if (!actividad) continue;
+    const colA = String(fila[0] ?? "").trim();
+    const colB = String(fila[1] ?? "").trim();
 
-    const cumplimientoRaw = String(fila[1] ?? "").trim();
-    const observaciones = String(fila[colObservaciones] ?? "").trim();
-    const estado: EstadoActividad = esMarcaNoCumple(cumplimientoRaw)
-      ? "NO_CUMPLE"
-      : esMarcaCumple(cumplimientoRaw)
-        ? "CUMPLE"
-        : "NO_REALIZADO";
+    if (dentroDeObservaciones) {
+      if (colA) observacionesLineas.push(colA);
+      if (colB && colB !== colA) observacionesLineas.push(colB);
+      continue;
+    }
 
-    actividades.push({ actividad, estado, observaciones });
+    if (!colA) continue;
+
+    if (/OBSERVACION/i.test(normalizar(colA))) {
+      dentroDeObservaciones = true;
+      const resto = colA.replace(/^\s*OBSERVACIONES?\s*:?\s*/i, "").trim();
+      if (resto) observacionesLineas.push(resto);
+      if (colB) observacionesLineas.push(colB);
+      continue;
+    }
+
+    if (/^D[IÍ]A\s*\d/i.test(colA)) {
+      diaActual = colA;
+      if (!colB) continue;
+    }
+
+    const estado: EstadoActividad = esMarcaNoCumple(colB) ? "NO_CUMPLE" : esMarcaCumple(colB) ? "CUMPLE" : "NO_REALIZADO";
+    actividades.push({ dia: diaActual, actividad: colA, estado });
   }
 
-  return actividades;
+  const observaciones = observacionesLineas.join(" ").trim();
+  return { actividades, observaciones: observaciones || null };
 }
 
 function buscarFechaVisita(workbook: XLSX.WorkBook): string | null {
@@ -162,7 +206,7 @@ function buscarFechaVisita(workbook: XLSX.WorkBook): string | null {
     for (const fila of filas) {
       for (let c = 0; c < fila.length; c++) {
         const texto = normalizar(fila[c]);
-        if (texto === "FECHA" || texto.includes("FECHA DE VISITA") || texto.includes("FECHA DE LA VISITA")) {
+        if (texto === "FECHA" || texto === "FECHA:" || texto.includes("FECHA DE VISITA") || texto.includes("FECHA DE LA VISITA")) {
           const valor = String(fila[c + 1] ?? "").trim();
           if (valor) return valor;
         }
@@ -178,14 +222,34 @@ const EXTENSIONES_IMAGEN: Record<string, string> = {
   jpeg: "jpeg",
 };
 
+const TEXTOS_A_IGNORAR = new Set(["FOTOS", "FOTOGRAFIAS", "FOTOGRAFIA", "ANEXOS", "EVIDENCIA", "EVIDENCIAS", "EVIDENCIA FOTOGRAFICA"]);
+
+function descripcionesHojaFotos(workbook: XLSX.WorkBook): string[] {
+  const nombreHoja = buscarHoja(workbook, /FOTO/);
+  if (!nombreHoja) return [];
+  const filas = hojaComoMatriz(workbook, nombreHoja);
+  const textos: string[] = [];
+  for (const fila of filas) {
+    for (const celda of fila) {
+      const valor = String(celda ?? "").trim();
+      if (!valor || TEXTOS_A_IGNORAR.has(normalizar(valor))) continue;
+      textos.push(valor);
+    }
+  }
+  return textos;
+}
+
 // El mapeo dibujo->celda de xlsx es complejo de reconstruir de forma confiable;
-// como el Excel trae una pestaña FOTOS dedicada solo a evidencia fotográfica,
-// se toman todas las imágenes incrustadas en el archivo como Anexos.
-async function extraerFotos(archivo: File): Promise<FotoInforme[]> {
+// como el Excel trae una pestaña FOTOS dedicada solo a evidencia fotográfica, se
+// toman todas las imágenes incrustadas en el archivo y se emparejan en orden con
+// los textos de esa pestaña (que normalmente son los pies de foto).
+async function extraerFotos(archivo: File, workbook: XLSX.WorkBook): Promise<FotoInforme[]> {
   const zip = await JSZip.loadAsync(await archivo.arrayBuffer());
   const entradas = Object.values(zip.files)
     .filter((f) => !f.dir && /^xl\/media\//.test(f.name))
     .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+
+  const descripciones = descripcionesHojaFotos(workbook);
 
   const fotos: FotoInforme[] = [];
   for (const entrada of entradas) {
@@ -193,7 +257,11 @@ async function extraerFotos(archivo: File): Promise<FotoInforme[]> {
     const tipoMime = EXTENSIONES_IMAGEN[extension];
     if (!tipoMime) continue;
     const base64 = await entrada.async("base64");
-    fotos.push({ nombre: entrada.name.split("/").pop() ?? entrada.name, dataUrl: `data:image/${tipoMime};base64,${base64}` });
+    fotos.push({
+      nombre: entrada.name.split("/").pop() ?? entrada.name,
+      dataUrl: `data:image/${tipoMime};base64,${base64}`,
+      descripcion: descripciones[fotos.length] || null,
+    });
   }
   return fotos;
 }
@@ -203,9 +271,9 @@ export async function parseInformeExcel(archivo: File): Promise<DatosInformeDiag
   const workbook = XLSX.read(buffer, { type: "array" });
 
   const criteriosDiagnostico = extraerDiagnostico(workbook);
-  const actividadesPlan = extraerPlan(workbook);
+  const { actividades: actividadesPlan, observaciones: observacionesPlan } = extraerPlan(workbook);
   const fechaVisita = buscarFechaVisita(workbook);
-  const fotos = await extraerFotos(archivo);
+  const fotos = await extraerFotos(archivo, workbook);
 
   if (criteriosDiagnostico.length === 0 && actividadesPlan.length === 0) {
     throw new Error(
@@ -213,5 +281,5 @@ export async function parseInformeExcel(archivo: File): Promise<DatosInformeDiag
     );
   }
 
-  return { fechaVisita, criteriosDiagnostico, actividadesPlan, fotos };
+  return { fechaVisita, criteriosDiagnostico, actividadesPlan, observacionesPlan, fotos };
 }
