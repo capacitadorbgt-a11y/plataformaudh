@@ -1,4 +1,4 @@
-import type { Escuela } from "@/types/database";
+import type { EscuelaConProcesos } from "@/components/EscuelasTable";
 
 const COLUMNAS = [
   "Escuela",
@@ -6,20 +6,20 @@ const COLUMNAS = [
   "Ciudad",
   "Zona",
   "Capacidad",
-  "Procesos completados",
+  "Procesos 2026",
   "Estado",
   "Fecha última visita",
   "Observaciones",
 ] as const;
 
-function filaComoTexto(e: Escuela): string[] {
+function filaComoTexto(e: EscuelaConProcesos): string[] {
   return [
     e.nombre,
     e.provincia ?? "",
     e.ciudad ?? "",
     e.zona ?? "",
     e.capacidad != null ? String(e.capacidad) : "",
-    e.procesos_completados != null ? String(e.procesos_completados) : "",
+    String(e.procesos2026),
     e.estado,
     e.fecha_ultima_visita ?? "",
     e.observaciones ?? "",
@@ -49,7 +49,7 @@ function csvEscape(valor: string) {
   return valor;
 }
 
-export function exportarCSV(escuelas: Escuela[]) {
+export function exportarCSV(escuelas: EscuelaConProcesos[]) {
   const filas = [COLUMNAS.map(csvEscape).join(",")];
   for (const e of escuelas) {
     filas.push(filaComoTexto(e).map(csvEscape).join(","));
@@ -62,7 +62,7 @@ function htmlEscape(valor: string) {
   return valor.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
-export function exportarXLS(escuelas: Escuela[]) {
+export function exportarXLS(escuelas: EscuelaConProcesos[]) {
   const encabezado = COLUMNAS.map((c) => `<th>${htmlEscape(c)}</th>`).join("");
   const filas = escuelas
     .map((e) => `<tr>${filaComoTexto(e).map((v) => `<td>${htmlEscape(v)}</td>`).join("")}</tr>`)
@@ -72,7 +72,7 @@ export function exportarXLS(escuelas: Escuela[]) {
   descargarBlob(new Blob([html], { type: "application/vnd.ms-excel" }), nombreConFecha("xls"));
 }
 
-export async function exportarPDF(escuelas: Escuela[]) {
+export async function exportarPDF(escuelas: EscuelaConProcesos[]) {
   const { jsPDF } = await import("jspdf");
   const autoTable = (await import("jspdf-autotable")).default;
 

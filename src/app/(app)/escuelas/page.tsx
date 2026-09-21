@@ -35,6 +35,24 @@ export default async function EscuelasPage({
 
   const { data: escuelas } = await query.returns<Escuela[]>();
 
+  const { data: seguimientos2026 } = await supabase
+    .from("seguimientos")
+    .select("escuela_id")
+    .gte("fecha_capacitacion", "2026-01-01")
+    .lte("fecha_capacitacion", "2026-12-31")
+    .not("escuela_id", "is", null)
+    .returns<{ escuela_id: string }[]>();
+
+  const procesosPorEscuela = new Map<string, number>();
+  for (const s of seguimientos2026 ?? []) {
+    procesosPorEscuela.set(s.escuela_id, (procesosPorEscuela.get(s.escuela_id) ?? 0) + 1);
+  }
+
+  const escuelasConProcesos = (escuelas ?? []).map((e) => ({
+    ...e,
+    procesos2026: procesosPorEscuela.get(e.id) ?? 0,
+  }));
+
   const hayFiltros = searchParams.q || searchParams.estado || searchParams.ciudad;
 
   return (
@@ -87,7 +105,7 @@ export default async function EscuelasPage({
         </div>
       </form>
 
-      <EscuelasTable escuelas={escuelas ?? []} />
+      <EscuelasTable escuelas={escuelasConProcesos} />
     </div>
   );
 }
