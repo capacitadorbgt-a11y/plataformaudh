@@ -34,6 +34,8 @@ export interface FotoInforme {
   descripcion: string | null;
 }
 
+export type AptitudEscuela = "APTO" | "NO_APTO";
+
 export interface DatosInformeDiagnostico {
   metaDiagnostico: MetadatosVisita;
   metaPlan: MetadatosVisita;
@@ -42,6 +44,7 @@ export interface DatosInformeDiagnostico {
   observacionesGeneralesDiagnostico: string | null;
   observacionesGeneralesPlan: string | null;
   fotos: FotoInforme[];
+  aptitud: AptitudEscuela | null;
 }
 
 export function normalizar(valor: unknown): string {
@@ -336,6 +339,31 @@ async function extraerFotos(archivo: File, workbook: XLSX.WorkBook): Promise<Fot
   return fotos;
 }
 
+// Busca en las notas libres del Excel (p.ej. la fila "Guía de Formación: —
+// El PDV está apto para ser escuela") si el evaluador dejó constancia de si
+// el PDV queda apto o no apto para ser Escuela de Formación. "NO APTO" se
+// revisa primero porque "APTO" es una subcadena de esa misma frase.
+function determinarAptitud(
+  filasPlan: FilaPlan[],
+  observacionesGeneralesPlan: string | null,
+  observacionesGeneralesDiagnostico: string | null
+): AptitudEscuela | null {
+  const textos: string[] = [];
+  for (const f of filasPlan) {
+    if (f.texto) textos.push(f.texto);
+    if (f.observaciones) textos.push(f.observaciones);
+  }
+  if (observacionesGeneralesPlan) textos.push(observacionesGeneralesPlan);
+  if (observacionesGeneralesDiagnostico) textos.push(observacionesGeneralesDiagnostico);
+
+  const normalizados = textos.map(normalizar);
+  // Admite variantes como "no apto", "no es apto", "no está apto", "no se
+  // encuentra apto": hasta 3 palabras de relleno entre "no" y "apto".
+  if (normalizados.some((t) => /\bNO\b(\s+\w+){0,3}\s+APT[OA]\b/.test(t))) return "NO_APTO";
+  if (normalizados.some((t) => /\bAPT[OA]\b/.test(t))) return "APTO";
+  return null;
+}
+
 export async function parseInformeExcel(archivo: File): Promise<DatosInformeDiagnostico> {
   const buffer = await archivo.arrayBuffer();
   const workbook = XLSX.read(buffer, { type: "array" });
@@ -358,6 +386,7 @@ export async function parseInformeExcel(archivo: File): Promise<DatosInformeDiag
     observacionesGeneralesDiagnostico: diagnostico.observaciones,
     observacionesGeneralesPlan: plan.observaciones,
     fotos,
+    aptitud: determinarAptitud(plan.filas, plan.observaciones, diagnostico.observaciones),
   };
 }
 

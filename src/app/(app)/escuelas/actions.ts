@@ -191,6 +191,25 @@ export async function uploadInforme(escuelaId: string, formData: FormData) {
   return { error: null };
 }
 
+export async function actualizarEstadoDesdeInforme(escuelaId: string, estado: "ACTIVO" | "INACTIVO") {
+  const { user } = await requirePermiso("escuelas");
+  const supabase = createClient();
+
+  const { error } = await supabase.from("escuelas").update({ estado }).eq("id", escuelaId);
+
+  revalidatePath(`/escuelas/${escuelaId}`);
+  revalidatePath("/escuelas");
+
+  if (error) return { error: error.message };
+
+  await logAudit(user.id, "editar_escuela", {
+    entidad: "escuela",
+    entidadId: escuelaId,
+    detalle: `Estado actualizado a ${estado} según el informe de cumplimiento generado`,
+  });
+  return { error: null };
+}
+
 export async function deleteInforme(escuelaId: string, informeId: string, storagePath: string) {
   const { user } = await requireAdmin();
   const supabase = createClient();
