@@ -45,6 +45,40 @@ async function cargarSeguimientosPermanencia(
   return data ?? [];
 }
 
+type SeguimientoEnProceso = Pick<
+  Seguimiento,
+  "id" | "pdv_solicitud" | "fecha_capacitacion" | "cargo" | "escuela_nombre_libre"
+> & { escuelas: { nombre: string } | null };
+
+// Seguimientos que siguen "en proceso" y cuya fecha de inicio (capacitación)
+// ya lleva mas de 3 dias, para recordar darles seguimiento.
+async function cargarSeguimientosEnProcesoVencidos(
+  supabase: ReturnType<typeof createClient>
+): Promise<SeguimientoEnProceso[]> {
+  const hoy = new Date();
+  const hace3Dias = new Date(hoy);
+  hace3Dias.setDate(hoy.getDate() - 3);
+
+  const { data } = await supabase
+    .from("seguimientos")
+    .select("id, pdv_solicitud, fecha_capacitacion, cargo, escuela_nombre_libre, escuelas(nombre)")
+    .eq("estado_proceso", "EN_PROCESO")
+    .not("fecha_capacitacion", "is", null)
+    .lte("fecha_capacitacion", aFechaISO(hace3Dias))
+    .order("fecha_capacitacion", { ascending: true })
+    .limit(5)
+    .returns<SeguimientoEnProceso[]>();
+
+  return data ?? [];
+}
+
+function diasTranscurridos(fecha: string) {
+  const inicio = new Date(`${fecha}T00:00:00`);
+  const hoy = new Date();
+  const ms = hoy.setHours(0, 0, 0, 0) - inicio.setHours(0, 0, 0, 0);
+  return Math.floor(ms / 86400000);
+}
+
 const MAX_ESCUELAS_GRAFICO = 7;
 
 // Capacitaciones (seguimientos) de los ultimos 30 dias, agrupadas por
@@ -86,14 +120,21 @@ export default async function DashboardPage() {
 
   const puedeVerSeguimientos = tienePermiso(profile, "seguimientos");
 
-  const [{ data: escuelas }, { count: seguimientosCount }, { count: entregasCount }, permanencia, capacitacionesPorEscuela] =
-    await Promise.all([
-      supabase.from("escuelas").select("*").returns<Escuela[]>(),
-      supabase.from("seguimientos").select("*", { count: "exact", head: true }),
-      supabase.from("entregas").select("*", { count: "exact", head: true }),
-      puedeVerSeguimientos ? cargarSeguimientosPermanencia(supabase) : Promise.resolve([]),
-      puedeVerSeguimientos ? cargarCapacitacionesPorEscuela(supabase) : Promise.resolve([]),
-    ]);
+  const [
+    { data: escuelas },
+    { count: seguimientosCount },
+    { count: entregasCount },
+    permanencia,
+    capacitacionesPorEscuela,
+    enProcesoVencidos,
+  ] = await Promise.all([
+    supabase.from("escuelas").select("*").returns<Escuela[]>(),
+    supabase.from("seguimientos").select("*", { count: "exact", head: true }),
+    supabase.from("entregas").select("*", { count: "exact", head: true }),
+    puedeVerSeguimientos ? cargarSeguimientosPermanencia(supabase) : Promise.resolve([]),
+    puedeVerSeguimientos ? cargarCapacitacionesPorEscuela(supabase) : Promise.resolve([]),
+    puedeVerSeguimientos ? cargarSeguimientosEnProcesoVencidos(supabase) : Promise.resolve([]),
+  ]);
 
   const total = escuelas?.length ?? 0;
   const activas = escuelas?.filter((e) => e.estado === "ACTIVO").length ?? 0;
@@ -128,6 +169,39 @@ export default async function DashboardPage() {
         <StatCard label="Entregas registradas" value={entregasCount ?? 0} />
         <StatCard label="Zonas cubiertas" value={zonas.size} />
       </div>
+
+      {puedeVerSeguimientos && (
+        <div className="card p-5">
+          <h2 className="font-semibold">Seguimientos en proceso con demora</h2>
+          <p className="text-xs text-neutral-400 mb-3">
+            En proceso hace más de 3 días desde la fecha de inicio.
+          </p>
+          <div className="divide-y divide-neutral-100">
+            {enProcesoVencidos.map((s) => (
+              <Link
+                key={s.id}
+                href={`/seguimientos/${s.id}/editar`}
+                className="flex items-center justify-between py-3 hover:bg-neutral-50 -mx-2 px-2 rounded-lg"
+              >
+                <div>
+                  <div className="text-udh-600 font-medium">{s.pdv_solicitud || "—"}</div>
+                  <div className="text-xs text-neutral-400">
+                    {s.cargo || "Sin cargo"} · {s.escuelas?.nombre ?? s.escuela_nombre_libre ?? "—"}
+                  </div>
+                </div>
+                <span className="badge bg-amber-100 text-amber-700 shrink-0">
+                  {s.fecha_capacitacion ? diasTranscurridos(s.fecha_capacitacion) : "—"} días
+                </span>
+              </Link>
+            ))}
+            {enProcesoVencidos.length === 0 && (
+              <p className="text-sm text-neutral-400 py-3">
+                No hay seguimientos en proceso con más de 3 días de demora.
+              </p>
+            )}
+          </div>
+        </div>
+      )}
 
       {puedeVerSeguimientos && (
         <div className="card p-5">
