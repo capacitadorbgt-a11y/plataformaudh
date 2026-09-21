@@ -216,6 +216,14 @@ export async function generarInformePDF(params: {
   // ---------------------------------------------------------------------
   dibujarFooterBase();
 
+  const { logoUdhBase64 } = await import("@/lib/assets/logoUdh");
+  const logoDataUrl = `data:image/jpeg;base64,${logoUdhBase64}`;
+  const logoProps = doc.getImageProperties(logoDataUrl);
+  const logoAncho = 26;
+  const logoAlto = (logoAncho * logoProps.height) / logoProps.width;
+  doc.addImage(logoDataUrl, PAGE_WIDTH - MARGIN - logoAncho, y, logoAncho, logoAlto);
+  y += logoAlto + 6;
+
   doc.setFont("PoppinsBold", "normal");
   doc.setFontSize(19);
   doc.setTextColor(...NAVY);
