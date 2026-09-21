@@ -1,25 +1,31 @@
 import * as XLSX from "xlsx";
 import JSZip from "jszip";
 
-export type EstadoCriterio = "CUMPLE" | "NO_CUMPLE" | "NO_EVALUADO";
-export type EstadoActividad = "CUMPLE" | "NO_CUMPLE" | "NO_REALIZADO";
-
 export interface MarcaColaborador {
   etiqueta: string;
   valor: string;
 }
 
 export interface CriterioDiagnostico {
+  numero: string;
   categoria: string;
   detalle: string;
   marcas: MarcaColaborador[];
-  estado: EstadoCriterio;
 }
 
-export interface ActividadPlan {
-  dia: string;
-  actividad: string;
-  estado: EstadoActividad;
+export type FilaPlanTipo = "dia" | "categoria" | "actividad";
+
+export interface FilaPlan {
+  tipo: FilaPlanTipo;
+  texto: string;
+  cumplimiento: string;
+  observaciones: string;
+}
+
+export interface MetadatosVisita {
+  pdv: string | null;
+  fecha: string | null;
+  evaluador: string | null;
 }
 
 export interface FotoInforme {
@@ -29,14 +35,16 @@ export interface FotoInforme {
 }
 
 export interface DatosInformeDiagnostico {
-  fechaVisita: string | null;
+  metaDiagnostico: MetadatosVisita;
+  metaPlan: MetadatosVisita;
   criteriosDiagnostico: CriterioDiagnostico[];
-  actividadesPlan: ActividadPlan[];
-  observacionesPlan: string | null;
+  filasPlan: FilaPlan[];
+  observacionesGeneralesDiagnostico: string | null;
+  observacionesGeneralesPlan: string | null;
   fotos: FotoInforme[];
 }
 
-function normalizar(valor: unknown): string {
+export function normalizar(valor: unknown): string {
   return String(valor ?? "")
     .normalize("NFD")
     .replace(/[̀-ͯ]/g, "")
@@ -44,12 +52,12 @@ function normalizar(valor: unknown): string {
     .toUpperCase();
 }
 
-function esMarcaCumple(valor: string) {
+export function esMarcaCumple(valor: string) {
   const n = normalizar(valor);
   return n === "X" || n === "/" || n === "✓" || n === "SI" || n === "OK";
 }
 
-function esMarcaNoCumple(valor: string) {
+export function esMarcaNoCumple(valor: string) {
   const n = normalizar(valor);
   return n === "-" || n === "–" || n === "—" || n === "NO";
 }
@@ -68,9 +76,53 @@ function buscarHoja(workbook: XLSX.WorkBook, patron: RegExp): string | null {
   return workbook.SheetNames.find((n) => patron.test(normalizar(n))) ?? null;
 }
 
-function extraerDiagnostico(workbook: XLSX.WorkBook): CriterioDiagnostico[] {
+function extraerMetadatos(filas: unknown[][]): MetadatosVisita {
+  const meta: MetadatosVisita = { pdv: null, fecha: null, evaluador: null };
+  for (const fila of filas) {
+    for (let c = 0; c < fila.length; c++) {
+      const texto = normalizar(fila[c]);
+      if (!texto) continue;
+      const valor = String(fila[c + 1] ?? "").trim();
+      if (!valor) continue;
+      if (!meta.evaluador && texto.includes("EVALUADOR")) meta.evaluador = valor;
+      else if (!meta.fecha && texto.includes("FECHA")) meta.fecha = valor;
+      else if (!meta.pdv && (texto === "PDV" || texto.includes("NOMBRE PDV") || texto.includes("PDV ESCUELA"))) meta.pdv = valor;
+    }
+  }
+  return meta;
+}
+
+// Busca un bloque de observaciones libres tipo "OBSERVACIONES:" a partir de
+// `desde` y devuelve el texto unido junto con el índice donde debe detenerse
+// el escaneo de filas de datos (para no confundir esas líneas con actividades).
+function extraerBloqueObservaciones(filas: unknown[][], desde: number): { texto: string | null; indice: number } {
+  for (let i = desde; i < filas.length; i++) {
+    const colA = String(filas[i][0] ?? "").trim();
+    if (!colA) continue;
+    if (/OBSERVACION/i.test(normalizar(colA))) {
+      const lineas: string[] = [];
+      const resto = colA.replace(/^\s*OBSERVACIONES?\s*:?\s*/i, "").trim();
+      if (resto) lineas.push(resto);
+      for (let j = i; j < filas.length; j++) {
+        const fila = filas[j];
+        for (let c = j === i ? 1 : 0; c < fila.length; c++) {
+          const valor = String(fila[c] ?? "").trim();
+          if (valor) lineas.push(valor);
+        }
+      }
+      return { texto: lineas.join(" ").trim() || null, indice: i };
+    }
+  }
+  return { texto: null, indice: filas.length };
+}
+
+function extraerDiagnostico(workbook: XLSX.WorkBook): {
+  criterios: CriterioDiagnostico[];
+  meta: MetadatosVisita;
+  observaciones: string | null;
+} {
   const nombreHoja = buscarHoja(workbook, /DIAGN/);
-  if (!nombreHoja) return [];
+  if (!nombreHoja) return { criterios: [], meta: { pdv: null, fecha: null, evaluador: null }, observaciones: null };
   const filas = hojaComoMatriz(workbook, nombreHoja);
 
   let filaEncabezado = -1;
@@ -94,8 +146,8 @@ function extraerDiagnostico(workbook: XLSX.WorkBook): CriterioDiagnostico[] {
     columnas = [2, 3, 4, 5].map((indice, i) => ({ indice, etiqueta: `Colaborador ${i + 1}` }));
   }
 
-  // Justo debajo del encabezado de roles (ADMI/POLI/POLI/POLI) suele venir una
-  // fila con el nombre real de cada colaborador en esas mismas columnas.
+  const meta = extraerMetadatos(filas.slice(0, filaEncabezado === -1 ? 8 : filaEncabezado));
+
   let inicioDatos = filaEncabezado + 1;
   const filaNombres = filas[inicioDatos];
   if (filaNombres) {
@@ -116,12 +168,22 @@ function extraerDiagnostico(workbook: XLSX.WorkBook): CriterioDiagnostico[] {
 
   const criterios: CriterioDiagnostico[] = [];
   let categoriaActual = "General";
+  let siguiente = 1;
+  let finTabla = filas.length;
 
   for (let i = inicioDatos; i < filas.length; i++) {
     const fila = filas[i];
     const colA = String(fila[0] ?? "").trim();
     const colB = String(fila[1] ?? "").trim();
     if (!colA && !colB) continue;
+
+    // Solo la columna de la izquierda (donde van los rótulos de categoría) se
+    // revisa: el detalle del criterio (colB) puede mencionar la palabra
+    // "observación" en una oración normal sin ser el bloque de notas finales.
+    if (/OBSERVACION/i.test(normalizar(colA))) {
+      finTabla = i;
+      break;
+    }
 
     const marcas: MarcaColaborador[] = columnas.map((col) => ({
       etiqueta: col.etiqueta,
@@ -135,85 +197,93 @@ function extraerDiagnostico(workbook: XLSX.WorkBook): CriterioDiagnostico[] {
     }
     if (!colB) continue;
 
-    const algunaNoCumple = marcas.some((m) => esMarcaNoCumple(m.valor));
-    const algunaCumple = marcas.some((m) => esMarcaCumple(m.valor));
-    const estado: EstadoCriterio = algunaNoCumple ? "NO_CUMPLE" : algunaCumple ? "CUMPLE" : "NO_EVALUADO";
-
-    criterios.push({ categoria: categoriaActual, detalle: colB, marcas, estado });
+    criterios.push({ numero: colA || String(siguiente), categoria: categoriaActual, detalle: colB, marcas });
+    siguiente++;
   }
 
-  return criterios;
+  const { texto: observaciones } = extraerBloqueObservaciones(filas, finTabla);
+
+  return { criterios, meta, observaciones };
 }
 
-function extraerPlan(workbook: XLSX.WorkBook): { actividades: ActividadPlan[]; observaciones: string | null } {
+function extraerPlan(workbook: XLSX.WorkBook): {
+  filas: FilaPlan[];
+  meta: MetadatosVisita;
+  observaciones: string | null;
+} {
   const nombreHoja = buscarHoja(workbook, /PLAN/);
-  if (!nombreHoja) return { actividades: [], observaciones: null };
-  const filas = hojaComoMatriz(workbook, nombreHoja);
+  if (!nombreHoja) return { filas: [], meta: { pdv: null, fecha: null, evaluador: null }, observaciones: null };
+  const filasHoja = hojaComoMatriz(workbook, nombreHoja);
 
   let inicio = -1;
-  for (let i = 0; i < filas.length; i++) {
-    const textoA = normalizar(filas[i][0]);
-    const textoB = normalizar(filas[i][1]);
-    if (textoA.includes("ACTIVID") || textoB.includes("CUMPL") || /^D[IÍ]A\s*\d/.test(textoA)) {
-      inicio = textoA.includes("ACTIVID") || textoB.includes("CUMPL") ? i + 1 : i;
+  let colActividad = 0;
+  let colCumple = 1;
+  let colObservaciones = 2;
+  for (let i = 0; i < filasHoja.length; i++) {
+    const fila = filasHoja[i];
+    const textoA = normalizar(fila[0]);
+    // Un título de día ("DÍA 1: EVALUACIÓN Y OBSERVACIÓN DE PDV...") puede
+    // contener la palabra "OBSERVACIÓN" y disparar por error la detección de
+    // encabezado de columnas; por eso se revisa primero y corta el escaneo.
+    if (/^D[IÍ]A\s*\d/i.test(textoA)) {
+      inicio = i;
+      break;
+    }
+    let encontroEncabezado = false;
+    for (let c = 0; c < fila.length; c++) {
+      const texto = normalizar(fila[c]);
+      if (texto.includes("ACTIVID")) {
+        colActividad = c;
+        encontroEncabezado = true;
+      } else if (texto.includes("CUMPL")) {
+        colCumple = c;
+        encontroEncabezado = true;
+      } else if (texto.includes("OBSERV")) {
+        colObservaciones = c;
+        encontroEncabezado = true;
+      }
+    }
+    if (encontroEncabezado) {
+      inicio = i + 1;
       break;
     }
   }
-  if (inicio === -1) return { actividades: [], observaciones: null };
+  if (inicio === -1) return { filas: [], meta: { pdv: null, fecha: null, evaluador: null }, observaciones: null };
 
-  const actividades: ActividadPlan[] = [];
-  const observacionesLineas: string[] = [];
-  let diaActual = "";
-  let dentroDeObservaciones = false;
+  const meta = extraerMetadatos(filasHoja.slice(0, inicio));
 
-  for (let i = inicio; i < filas.length; i++) {
-    const fila = filas[i];
-    const colA = String(fila[0] ?? "").trim();
-    const colB = String(fila[1] ?? "").trim();
+  const filas: FilaPlan[] = [];
+  let finTabla = filasHoja.length;
 
-    if (dentroDeObservaciones) {
-      if (colA) observacionesLineas.push(colA);
-      if (colB && colB !== colA) observacionesLineas.push(colB);
-      continue;
-    }
-
+  for (let i = inicio; i < filasHoja.length; i++) {
+    const fila = filasHoja[i];
+    const colA = String(fila[colActividad] ?? "").trim();
     if (!colA) continue;
 
-    if (/OBSERVACION/i.test(normalizar(colA))) {
-      dentroDeObservaciones = true;
-      const resto = colA.replace(/^\s*OBSERVACIONES?\s*:?\s*/i, "").trim();
-      if (resto) observacionesLineas.push(resto);
-      if (colB) observacionesLineas.push(colB);
+    if (/^D[IÍ]A\s*\d/i.test(colA)) {
+      filas.push({ tipo: "dia", texto: colA, cumplimiento: "", observaciones: "" });
       continue;
     }
 
-    if (/^D[IÍ]A\s*\d/i.test(colA)) {
-      diaActual = colA;
-      if (!colB) continue;
+    if (/OBSERVACION/i.test(normalizar(colA))) {
+      finTabla = i;
+      break;
     }
 
-    const estado: EstadoActividad = esMarcaNoCumple(colB) ? "NO_CUMPLE" : esMarcaCumple(colB) ? "CUMPLE" : "NO_REALIZADO";
-    actividades.push({ dia: diaActual, actividad: colA, estado });
-  }
+    const cumplimiento = String(fila[colCumple] ?? "").trim();
+    const observacionesFila = String(fila[colObservaciones] ?? "").trim();
 
-  const observaciones = observacionesLineas.join(" ").trim();
-  return { actividades, observaciones: observaciones || null };
-}
-
-function buscarFechaVisita(workbook: XLSX.WorkBook): string | null {
-  for (const nombreHoja of workbook.SheetNames) {
-    const filas = hojaComoMatriz(workbook, nombreHoja);
-    for (const fila of filas) {
-      for (let c = 0; c < fila.length; c++) {
-        const texto = normalizar(fila[c]);
-        if (texto === "FECHA" || texto === "FECHA:" || texto.includes("FECHA DE VISITA") || texto.includes("FECHA DE LA VISITA")) {
-          const valor = String(fila[c + 1] ?? "").trim();
-          if (valor) return valor;
-        }
-      }
+    if (colA.endsWith(":") && !cumplimiento) {
+      filas.push({ tipo: "categoria", texto: colA, cumplimiento: "", observaciones: observacionesFila });
+      continue;
     }
+
+    filas.push({ tipo: "actividad", texto: colA, cumplimiento, observaciones: observacionesFila });
   }
-  return null;
+
+  const { texto: observaciones } = extraerBloqueObservaciones(filasHoja, finTabla);
+
+  return { filas, meta, observaciones };
 }
 
 const EXTENSIONES_IMAGEN: Record<string, string> = {
@@ -270,16 +340,115 @@ export async function parseInformeExcel(archivo: File): Promise<DatosInformeDiag
   const buffer = await archivo.arrayBuffer();
   const workbook = XLSX.read(buffer, { type: "array" });
 
-  const criteriosDiagnostico = extraerDiagnostico(workbook);
-  const { actividades: actividadesPlan, observaciones: observacionesPlan } = extraerPlan(workbook);
-  const fechaVisita = buscarFechaVisita(workbook);
+  const diagnostico = extraerDiagnostico(workbook);
+  const plan = extraerPlan(workbook);
   const fotos = await extraerFotos(archivo, workbook);
 
-  if (criteriosDiagnostico.length === 0 && actividadesPlan.length === 0) {
+  if (diagnostico.criterios.length === 0 && plan.filas.length === 0) {
     throw new Error(
       "No se encontraron las pestañas DIAGNOSTICO y PLAN en el Excel, o están vacías. Verifica el archivo."
     );
   }
 
-  return { fechaVisita, criteriosDiagnostico, actividadesPlan, observacionesPlan, fotos };
+  return {
+    metaDiagnostico: diagnostico.meta,
+    metaPlan: plan.meta,
+    criteriosDiagnostico: diagnostico.criterios,
+    filasPlan: plan.filas,
+    observacionesGeneralesDiagnostico: diagnostico.observaciones,
+    observacionesGeneralesPlan: plan.observaciones,
+    fotos,
+  };
+}
+
+// ---- Estadísticas derivadas (usadas por el generador de PDF y de texto) ----
+
+export interface EstadisticaFila {
+  etiqueta: string;
+  evaluados: number;
+  cumple: number;
+  noCumple: number;
+  pct: number;
+}
+
+function calcularFila(etiqueta: string, cumple: number, noCumple: number): EstadisticaFila {
+  const evaluados = cumple + noCumple;
+  return { etiqueta, evaluados, cumple, noCumple, pct: evaluados ? (cumple / evaluados) * 100 : 0 };
+}
+
+export function statsPorColaborador(criterios: CriterioDiagnostico[]): EstadisticaFila[] {
+  const etiquetas = criterios[0]?.marcas.map((m) => m.etiqueta) ?? [];
+  return etiquetas
+    .map((etiqueta, idx) => {
+      let cumple = 0;
+      let noCumple = 0;
+      for (const c of criterios) {
+        const valor = c.marcas[idx]?.valor ?? "";
+        if (esMarcaCumple(valor)) cumple++;
+        else if (esMarcaNoCumple(valor)) noCumple++;
+      }
+      return calcularFila(etiqueta, cumple, noCumple);
+    })
+    // Una columna de colaborador sin ninguna marca (plantilla con más
+    // columnas que personas evaluadas) no debe figurar como "0% cumplimiento".
+    .filter((f) => f.evaluados > 0);
+}
+
+export function totalizar(etiqueta: string, filas: EstadisticaFila[]): EstadisticaFila {
+  return calcularFila(
+    etiqueta,
+    filas.reduce((s, f) => s + f.cumple, 0),
+    filas.reduce((s, f) => s + f.noCumple, 0)
+  );
+}
+
+export function statsPorDia(filasPlan: FilaPlan[]): EstadisticaFila[] {
+  const orden: string[] = [];
+  const acumulado = new Map<string, { cumple: number; noCumple: number }>();
+  let diaActual = "";
+
+  for (const f of filasPlan) {
+    if (f.tipo === "dia") {
+      diaActual = f.texto.match(/^D[IÍ]A\s*\d+/i)?.[0]?.toUpperCase() ?? f.texto;
+      if (!acumulado.has(diaActual)) {
+        acumulado.set(diaActual, { cumple: 0, noCumple: 0 });
+        orden.push(diaActual);
+      }
+      continue;
+    }
+    if (f.tipo !== "actividad") continue;
+    if (!acumulado.has(diaActual)) {
+      acumulado.set(diaActual, { cumple: 0, noCumple: 0 });
+      orden.push(diaActual);
+    }
+    const entrada = acumulado.get(diaActual)!;
+    if (esMarcaCumple(f.cumplimiento)) entrada.cumple++;
+    else if (esMarcaNoCumple(f.cumplimiento)) entrada.noCumple++;
+  }
+
+  return orden
+    .map((dia) => calcularFila(dia, acumulado.get(dia)!.cumple, acumulado.get(dia)!.noCumple))
+    .filter((f) => f.evaluados > 0);
+}
+
+export interface ParametroNoCumplido {
+  numero: string;
+  categoria: string;
+  detalle: string;
+  colaboradores: string[];
+}
+
+export function parametrosNoCumplidos(criterios: CriterioDiagnostico[]): ParametroNoCumplido[] {
+  return criterios
+    .map((c) => ({
+      numero: c.numero,
+      categoria: c.categoria,
+      detalle: c.detalle,
+      colaboradores: c.marcas.filter((m) => esMarcaNoCumple(m.valor)).map((m) => m.etiqueta),
+    }))
+    .filter((r) => r.colaboradores.length > 0);
+}
+
+export function actividadesPlanNoCumplidas(filasPlan: FilaPlan[]): FilaPlan[] {
+  return filasPlan.filter((f) => f.tipo === "actividad" && !esMarcaCumple(f.cumplimiento));
 }
