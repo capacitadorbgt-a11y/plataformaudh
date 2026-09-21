@@ -7,7 +7,6 @@ import EscuelaFichaForm from "@/components/EscuelaFichaForm";
 import ColaboradorEditForm from "@/components/ColaboradorEditForm";
 import ColaboradorAddForm from "@/components/ColaboradorAddForm";
 import EntregaAddForm from "@/components/EntregaAddForm";
-import InformeUploadForm from "@/components/InformeUploadForm";
 import GenerarInformeDiagnostico from "@/components/GenerarInformeDiagnostico";
 import { deleteInforme } from "../actions";
 import type { Colaborador, Entrega, Escuela, Informe, Seguimiento } from "@/types/database";
@@ -172,8 +171,6 @@ export default async function EscuelaDetailPage({
             <p className="text-sm text-neutral-400">Sin informes cargados.</p>
           )}
         </div>
-
-        <InformeUploadForm escuelaId={escuela.id} />
       </div>
 
       {/* Entregas / recompensas */}
