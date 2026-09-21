@@ -161,6 +161,10 @@ export async function generarInformePDF(params: {
     const alturaBloque = lineas.length * alturaLinea + 4;
 
     asegurarEspacio(alturaBloque);
+    // asegurarEspacio puede saltar de página y eso redibuja el pie, que deja
+    // la fuente en "bold"; se vuelve a fijar aquí para no heredar ese estado.
+    doc.setFont("Poppins", opts.negrita ? "bold" : "normal");
+    doc.setFontSize(tamano);
 
     if (opts.fondo) {
       doc.setFillColor(...opts.fondo);
@@ -340,7 +344,13 @@ export async function generarInformePDF(params: {
 
   if (datos.criteriosDiagnostico.length > 0) {
     subtitulo("Detalle de la Evaluación Diagnóstica de PDV");
-    const etiquetas = datos.criteriosDiagnostico[0]?.marcas.map((m) => m.etiqueta) ?? [];
+    const todasEtiquetas = datos.criteriosDiagnostico[0]?.marcas.map((m) => m.etiqueta) ?? [];
+    // Columnas de colaborador que en el Excel quedaron completamente en blanco
+    // (plantilla con más casillas ADMIN/POLI que personas evaluadas) se omiten.
+    const indicesConDatos = todasEtiquetas
+      .map((_, idx) => idx)
+      .filter((idx) => datos.criteriosDiagnostico.some((c) => c.marcas[idx]?.valor));
+    const etiquetas = indicesConDatos.map((idx) => todasEtiquetas[idx]);
     const cuerpoDiagnostico: (string | Celda)[][] = [];
     let categoriaActual = "";
     for (const c of datos.criteriosDiagnostico) {
@@ -353,7 +363,7 @@ export async function generarInformePDF(params: {
       cuerpoDiagnostico.push([
         c.numero,
         c.detalle,
-        ...c.marcas.map((m) => celdaEstado(estadoDiagnostico(m.valor))),
+        ...indicesConDatos.map((idx) => celdaEstado(estadoDiagnostico(c.marcas[idx]?.valor ?? ""))),
       ]);
     }
     tablaEstandar([["N°", "DETALLE", ...etiquetas]], cuerpoDiagnostico);

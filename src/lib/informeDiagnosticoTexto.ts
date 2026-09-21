@@ -50,6 +50,12 @@ function criterioSinCumplimientoAlguno(criterios: CriterioDiagnostico[]) {
   return criterios.find((c) => c.marcas.length > 0 && c.marcas.every((m) => esMarcaNoCumple(m.valor)));
 }
 
+// Las etiquetas de colaborador combinan rol y nombre ("ADMIN (Henrry)") para
+// las tablas; en prosa es más natural referirse solo al nombre.
+function soloNombre(etiqueta: string): string {
+  return etiqueta.match(/\(([^)]+)\)/)?.[1] ?? etiqueta;
+}
+
 export function textoConclusiones(datos: DatosInformeDiagnostico, nombreEscuela: string): string[] {
   const statsColab = statsPorColaborador(datos.criteriosDiagnostico);
   const totalDiag = totalizar("TOTAL Evaluación Diagnóstica", statsColab);
@@ -71,7 +77,7 @@ export function textoConclusiones(datos: DatosInformeDiagnostico, nombreEscuela:
     if (peor.pct < mejor.pct) {
       const categorias = categoriasConMasFallos(datos.criteriosDiagnostico, peor.etiqueta);
       bullets.push(
-        `${peor.etiqueta} presenta el menor nivel de cumplimiento (${peor.pct.toFixed(1)}%)` +
+        `${soloNombre(peor.etiqueta)} presenta el menor nivel de cumplimiento (${peor.pct.toFixed(1)}%)` +
           `${categorias ? `, principalmente en ${categorias}` : ""}.`
       );
     } else if (peor.evaluados > 0) {
@@ -96,8 +102,11 @@ export function textoConclusiones(datos: DatosInformeDiagnostico, nombreEscuela:
     );
   }
 
-  if (datos.observacionesGeneralesDiagnostico) {
-    bullets.push(`Se registran observaciones adicionales del evaluador durante el diagnóstico: ${datos.observacionesGeneralesDiagnostico}`);
+  const hallazgos = cruceObservaciones(datos).length;
+  if (hallazgos > 0) {
+    bullets.push(
+      `Se registran ${hallazgos} observaciones adicionales del evaluador durante la visita, detalladas en la sección 3 de este informe.`
+    );
   }
 
   if (bullets.length === 0) {
@@ -117,7 +126,7 @@ export function textoRecomendaciones(datos: DatosInformeDiagnostico): string[] {
     if (peor.pct < mejor.pct) {
       const categorias = categoriasConMasFallos(datos.criteriosDiagnostico, peor.etiqueta);
       recomendaciones.push(
-        `Reforzar con ${peor.etiqueta} los criterios de${categorias ? ` ${categorias}` : " la evaluación diagnóstica"} mediante seguimiento individual.`
+        `Reforzar con ${soloNombre(peor.etiqueta)} los criterios de${categorias ? ` ${categorias}` : " la evaluación diagnóstica"} mediante seguimiento individual.`
       );
     }
   }
@@ -154,6 +163,10 @@ const PALABRAS_VACIAS = new Set([
   "PARA", "COMO", "PERO", "DESDE", "HASTA", "ENTRE", "SOBRE", "ESTE", "ESTA", "ESTOS", "ESTAS",
   "CUANDO", "DONDE", "PORQUE", "TIENE", "TIENEN", "SIDO", "FUERON", "ESTABA", "ESTAN", "CADA",
   "TODO", "TODA", "TODOS", "TODAS", "DURANTE", "DEBE", "DEBEN", "SEGUN",
+  // Términos genéricos del dominio (aparecen en casi cualquier hallazgo y
+  // acción por igual) que no sirven para distinguir un tema de otro.
+  "FORMACION", "ESCUELA", "PROCESO", "PERSONAL", "VISITA", "TRABAJO", "REALIZO",
+  "REALIZA", "REALIZAR", "PLAN", "BOGATI", "PUNTO", "VENTA", "PRODUCTO", "PRODUCTOS",
 ]);
 
 function palabrasClave(texto: string): Set<string> {
@@ -171,10 +184,16 @@ export interface CruceObservacion {
 export function cruceObservaciones(datos: DatosInformeDiagnostico): CruceObservacion[] {
   let hallazgos: string[] = [];
   if (datos.observacionesGeneralesDiagnostico) {
-    hallazgos = datos.observacionesGeneralesDiagnostico
-      .split(/(?<=[.!?])\s+(?=[A-ZÁÉÍÓÚÑ])/)
-      .map((s) => s.trim())
-      .filter((s) => s.length > 15);
+    // Las notas del evaluador suelen venir como párrafos separados por línea
+    // en blanco (una idea completa cada uno) o, dentro de un mismo párrafo,
+    // como una lista de una idea por línea. Se respeta esa estructura en vez
+    // de cortar por oración, que fragmentaba ideas que debían ir juntas.
+    for (const bloque of datos.observacionesGeneralesDiagnostico.split(/\n\s*\n+/)) {
+      const lineas = bloque.split(/\n+/).map((l) => l.trim()).filter(Boolean);
+      if (lineas.length > 1) hallazgos.push(...lineas);
+      else if (lineas.length === 1) hallazgos.push(lineas[0].replace(/\s+/g, " "));
+    }
+    hallazgos = hallazgos.filter((s) => s.length > 10);
   }
 
   if (hallazgos.length === 0) {
@@ -210,7 +229,9 @@ export function cruceObservaciones(datos: DatosInformeDiagnostico): CruceObserva
     let mejor: { texto: string; coincidencias: number } | null = null;
     for (const accion of acciones) {
       const coincidencias = [...palabrasHallazgo].filter((w) => accion.palabras.has(w)).length;
-      if (coincidencias > 0 && (!mejor || coincidencias > mejor.coincidencias)) {
+      // Se exigen al menos 2 palabras clave compartidas: con 1 sola coincidencia
+      // el cruce resultaba en falsos positivos entre temas no relacionados.
+      if (coincidencias >= 2 && (!mejor || coincidencias > mejor.coincidencias)) {
         mejor = { texto: accion.texto, coincidencias };
       }
     }
