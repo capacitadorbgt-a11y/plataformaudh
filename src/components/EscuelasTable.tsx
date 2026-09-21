@@ -6,7 +6,7 @@ import { EstadoBadge } from "@/components/Badge";
 import type { Escuela } from "@/types/database";
 import { exportarCSV, exportarXLS, exportarPDF } from "@/lib/exportEscuelas";
 
-export type EscuelaConProcesos = Escuela & { procesos2026: number };
+export type EscuelaConProcesos = Escuela & { procesos: number };
 
 export default function EscuelasTable({ escuelas }: { escuelas: EscuelaConProcesos[] }) {
   const [menuAbierto, setMenuAbierto] = useState(false);
@@ -63,7 +63,7 @@ export default function EscuelasTable({ escuelas }: { escuelas: EscuelaConProces
               <th className="px-4 py-3 font-medium">Escuela</th>
               <th className="px-4 py-3 font-medium">Ciudad</th>
               <th className="px-4 py-3 font-medium">Zona</th>
-              <th className="px-4 py-3 font-medium">Procesos 2026</th>
+              <th className="px-4 py-3 font-medium">Procesos</th>
               <th className="px-4 py-3 font-medium">Estado</th>
             </tr>
           </thead>
@@ -78,7 +78,7 @@ export default function EscuelasTable({ escuelas }: { escuelas: EscuelaConProces
                 </td>
                 <td className="px-4 py-3 text-neutral-600">{e.ciudad}</td>
                 <td className="px-4 py-3 text-neutral-600">{e.zona}</td>
-                <td className="px-4 py-3 text-neutral-600">{e.procesos2026}</td>
+                <td className="px-4 py-3 text-neutral-600">{e.procesos}</td>
                 <td className="px-4 py-3"><EstadoBadge estado={e.estado} /></td>
               </tr>
             ))}

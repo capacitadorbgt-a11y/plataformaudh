@@ -35,22 +35,23 @@ export default async function EscuelasPage({
 
   const { data: escuelas } = await query.returns<Escuela[]>();
 
-  const { data: seguimientos2026 } = await supabase
+  const anioActual = new Date().getFullYear();
+  const { data: seguimientosAnio } = await supabase
     .from("seguimientos")
     .select("escuela_id")
-    .gte("fecha_capacitacion", "2026-01-01")
-    .lte("fecha_capacitacion", "2026-12-31")
+    .gte("fecha_capacitacion", `${anioActual}-01-01`)
+    .lte("fecha_capacitacion", `${anioActual}-12-31`)
     .not("escuela_id", "is", null)
     .returns<{ escuela_id: string }[]>();
 
   const procesosPorEscuela = new Map<string, number>();
-  for (const s of seguimientos2026 ?? []) {
+  for (const s of seguimientosAnio ?? []) {
     procesosPorEscuela.set(s.escuela_id, (procesosPorEscuela.get(s.escuela_id) ?? 0) + 1);
   }
 
   const escuelasConProcesos = (escuelas ?? []).map((e) => ({
     ...e,
-    procesos2026: procesosPorEscuela.get(e.id) ?? 0,
+    procesos: procesosPorEscuela.get(e.id) ?? 0,
   }));
 
   const hayFiltros = searchParams.q || searchParams.estado || searchParams.ciudad;
