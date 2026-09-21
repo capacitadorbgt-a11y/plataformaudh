@@ -129,13 +129,7 @@ export async function deleteColaborador(escuelaId: string, colaboradorId: string
   revalidatePath(`/escuelas/${escuelaId}`);
 }
 
-const TIPOS_INFORME_PERMITIDOS = [
-  "application/pdf",
-  "application/msword",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  "application/vnd.ms-excel",
-  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-];
+const TIPOS_INFORME_PERMITIDOS = ["application/pdf"];
 
 // Supabase Storage rechaza ciertas claves (tildes, espacios, etc.) con
 // "Invalid key". El nombre original y legible se guarda aparte en
@@ -163,8 +157,8 @@ export async function uploadInforme(escuelaId: string, formData: FormData) {
   }
 
   const file = archivo as File;
-  if (TIPOS_INFORME_PERMITIDOS.length && file.type && !TIPOS_INFORME_PERMITIDOS.includes(file.type)) {
-    return { error: "Tipo de archivo no permitido. Sube un PDF, Word (doc/docx) o Excel (xls/xlsx)." };
+  if (file.type && !TIPOS_INFORME_PERMITIDOS.includes(file.type)) {
+    return { error: "Tipo de archivo no permitido. Sube un documento en formato PDF." };
   }
 
   const rutaStorage = `${escuelaId}/${Date.now()}-${sanitizeStorageKey(file.name)}`;

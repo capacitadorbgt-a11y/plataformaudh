@@ -8,6 +8,7 @@ import ColaboradorEditForm from "@/components/ColaboradorEditForm";
 import ColaboradorAddForm from "@/components/ColaboradorAddForm";
 import EntregaAddForm from "@/components/EntregaAddForm";
 import GenerarInformeDiagnostico from "@/components/GenerarInformeDiagnostico";
+import AgregarInformeButton from "@/components/AgregarInformeButton";
 import { deleteInforme } from "../actions";
 import type { Colaborador, Entrega, Escuela, Informe, Seguimiento } from "@/types/database";
 
@@ -142,6 +143,9 @@ export default async function EscuelaDetailPage({
         </div>
 
         <GenerarInformeDiagnostico escuela={escuela} />
+        <div className="mb-4">
+          <AgregarInformeButton escuelaId={escuela.id} />
+        </div>
 
         <div className="space-y-2 mb-4">
           {informesConUrl.map((inf) => (
