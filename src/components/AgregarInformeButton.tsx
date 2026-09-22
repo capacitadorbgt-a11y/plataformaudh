@@ -1,22 +1,24 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import Modal from "@/components/Modal";
-import { uploadInforme } from "@/app/(app)/escuelas/actions";
+import { createClient } from "@/lib/supabase/client";
+import { subirInformeCliente } from "@/lib/informesCliente";
 import { useSaveWithModal } from "@/lib/useSaveWithModal";
 
-export default function AgregarInformeButton({ escuelaId }: { escuelaId: string }) {
-  const { showModal, error, isPending, run, goToEscuelas } = useSaveWithModal();
+export default function AgregarInformeButton({ escuelaId, creadoPor }: { escuelaId: string; creadoPor: string }) {
+  const { showModal, error, isPending, run, closeModal } = useSaveWithModal();
+  const router = useRouter();
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
     const archivo = e.target.files?.[0];
     e.target.value = "";
     if (!archivo) return;
 
-    run(async () => {
-      const formData = new FormData();
-      formData.set("archivo", archivo);
-      return uploadInforme(escuelaId, formData);
-    });
+    run(
+      () => subirInformeCliente(createClient(), escuelaId, archivo, creadoPor),
+      () => router.refresh()
+    );
   }
 
   return (
@@ -34,8 +36,8 @@ export default function AgregarInformeButton({ escuelaId }: { escuelaId: string 
       {error && <p className="text-sm text-red-600 mt-2">{error}</p>}
 
       {showModal && (
-        <Modal title="Datos guardados" onClose={goToEscuelas}>
-          El informe se cargó correctamente.
+        <Modal title="Datos guardados" onClose={closeModal}>
+          El informe se cargó correctamente y ya aparece en la lista de Informes.
         </Modal>
       )}
     </>

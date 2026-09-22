@@ -129,62 +129,6 @@ export async function deleteColaborador(escuelaId: string, colaboradorId: string
   revalidatePath(`/escuelas/${escuelaId}`);
 }
 
-const TIPOS_INFORME_PERMITIDOS = ["application/pdf"];
-
-// Supabase Storage rechaza ciertas claves (tildes, espacios, etc.) con
-// "Invalid key". El nombre original y legible se guarda aparte en
-// nombre_archivo; aqui solo se genera una clave segura para el storage.
-function sanitizeStorageKey(nombre: string) {
-  const sinAcentos = nombre
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "");
-  const partes = sinAcentos.split(/(\.[^.]+)$/); // separa la extension
-  const base = (partes[0] || "archivo")
-    .replace(/[^a-zA-Z0-9._-]+/g, "-")
-    .replace(/-+/g, "-")
-    .replace(/^-|-$/g, "");
-  const extension = (partes[1] || "").replace(/[^a-zA-Z0-9.]/g, "");
-  return (base || "archivo") + extension;
-}
-
-export async function uploadInforme(escuelaId: string, formData: FormData) {
-  const { user } = await requirePermiso("escuelas");
-  const supabase = createClient();
-
-  const archivo = formData.get("archivo");
-  if (!(archivo instanceof File) || archivo.size === 0) {
-    return { error: "Selecciona un archivo para subir" };
-  }
-
-  const file = archivo as File;
-  if (file.type && !TIPOS_INFORME_PERMITIDOS.includes(file.type)) {
-    return { error: "Tipo de archivo no permitido. Sube un documento en formato PDF." };
-  }
-
-  const rutaStorage = `${escuelaId}/${Date.now()}-${sanitizeStorageKey(file.name)}`;
-  const { error: uploadError } = await supabase.storage.from("informes").upload(rutaStorage, file);
-
-  if (uploadError) {
-    return { error: uploadError.message };
-  }
-
-  const { error } = await supabase.from("informes").insert({
-    escuela_id: escuelaId,
-    nombre_archivo: file.name,
-    tipo_archivo: file.type || null,
-    storage_path: rutaStorage,
-    tamano_bytes: file.size,
-    created_by: user.id,
-  });
-
-  revalidatePath(`/escuelas/${escuelaId}`);
-
-  if (error) return { error: error.message };
-
-  await logAudit(user.id, "subir_informe", { entidad: "escuela", entidadId: escuelaId, detalle: file.name });
-  return { error: null };
-}
-
 export async function actualizarEstadoDesdeInforme(escuelaId: string, estado: "ACTIVO" | "INACTIVO") {
   const { user } = await requirePermiso("escuelas");
   const supabase = createClient();

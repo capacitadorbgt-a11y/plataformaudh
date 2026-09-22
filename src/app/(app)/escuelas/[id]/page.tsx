@@ -142,9 +142,9 @@ export default async function EscuelaDetailPage({
           <h2 className="font-semibold">Informes</h2>
         </div>
 
-        <GenerarInformeDiagnostico escuela={escuela} />
+        <GenerarInformeDiagnostico escuela={escuela} creadoPor={profile.id} />
         <div className="mb-4">
-          <AgregarInformeButton escuelaId={escuela.id} />
+          <AgregarInformeButton escuelaId={escuela.id} creadoPor={profile.id} />
         </div>
 
         <div className="space-y-2 mb-4">

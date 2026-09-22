@@ -1,14 +1,18 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import Modal from "@/components/Modal";
-import { actualizarEstadoDesdeInforme, uploadInforme } from "@/app/(app)/escuelas/actions";
+import { actualizarEstadoDesdeInforme } from "@/app/(app)/escuelas/actions";
+import { createClient } from "@/lib/supabase/client";
+import { subirInformeCliente } from "@/lib/informesCliente";
 import { useSaveWithModal } from "@/lib/useSaveWithModal";
 import type { Escuela } from "@/types/database";
 
-export default function GenerarInformeDiagnostico({ escuela }: { escuela: Escuela }) {
-  const { showModal, error, isPending, run, goToEscuelas } = useSaveWithModal();
+export default function GenerarInformeDiagnostico({ escuela, creadoPor }: { escuela: Escuela; creadoPor: string }) {
+  const { showModal, error, isPending, run, closeModal } = useSaveWithModal();
   const [mensajeEstado, setMensajeEstado] = useState<string | null>(null);
+  const router = useRouter();
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
     const archivo = e.target.files?.[0];
@@ -17,38 +21,41 @@ export default function GenerarInformeDiagnostico({ escuela }: { escuela: Escuel
 
     setMensajeEstado(null);
 
-    run(async () => {
-      try {
-        const { parseInformeExcel } = await import("@/lib/informeDiagnosticoDatos");
-        const { generarInformePDF } = await import("@/lib/informeDiagnosticoPDF");
+    run(
+      async () => {
+        try {
+          const { parseInformeExcel } = await import("@/lib/informeDiagnosticoDatos");
+          const { generarInformePDF } = await import("@/lib/informeDiagnosticoPDF");
 
-        const datos = await parseInformeExcel(archivo);
-        const { blob, nombreArchivo } = await generarInformePDF({ escuela, datos });
+          const datos = await parseInformeExcel(archivo);
+          const { blob, nombreArchivo } = await generarInformePDF({ escuela, datos });
 
-        const formData = new FormData();
-        formData.set("archivo", new File([blob], nombreArchivo, { type: "application/pdf" }));
-        const resultadoSubida = await uploadInforme(escuela.id, formData);
-        if (resultadoSubida?.error) return resultadoSubida;
+          const supabase = createClient();
+          const pdfFile = new File([blob], nombreArchivo, { type: "application/pdf" });
+          const resultadoSubida = await subirInformeCliente(supabase, escuela.id, pdfFile, creadoPor);
+          if (resultadoSubida.error) return resultadoSubida;
 
-        if (datos.aptitud) {
-          const nuevoEstado = datos.aptitud === "APTO" ? "ACTIVO" : "INACTIVO";
-          const resultadoEstado = await actualizarEstadoDesdeInforme(escuela.id, nuevoEstado);
-          if (resultadoEstado?.error) {
-            setMensajeEstado(
-              `El informe indica que el PDV está ${datos.aptitud === "APTO" ? "apto" : "no apto"} para ser Escuela de Formación, pero no se pudo actualizar el estado: ${resultadoEstado.error}`
-            );
-          } else {
-            setMensajeEstado(
-              `El informe indica que el PDV está ${datos.aptitud === "APTO" ? "apto" : "no apto"} para ser Escuela de Formación: el estado de la escuela se actualizó a ${nuevoEstado}.`
-            );
+          if (datos.aptitud) {
+            const nuevoEstado = datos.aptitud === "APTO" ? "ACTIVO" : "INACTIVO";
+            const resultadoEstado = await actualizarEstadoDesdeInforme(escuela.id, nuevoEstado);
+            if (resultadoEstado?.error) {
+              setMensajeEstado(
+                `El informe indica que el PDV está ${datos.aptitud === "APTO" ? "apto" : "no apto"} para ser Escuela de Formación, pero no se pudo actualizar el estado: ${resultadoEstado.error}`
+              );
+            } else {
+              setMensajeEstado(
+                `El informe indica que el PDV está ${datos.aptitud === "APTO" ? "apto" : "no apto"} para ser Escuela de Formación: el estado de la escuela se actualizó a ${nuevoEstado}.`
+              );
+            }
           }
-        }
 
-        return { error: null };
-      } catch (err) {
-        return { error: err instanceof Error ? err.message : "No se pudo generar el informe." };
-      }
-    });
+          return { error: null };
+        } catch (err) {
+          return { error: err instanceof Error ? err.message : "No se pudo generar el informe." };
+        }
+      },
+      () => router.refresh()
+    );
   }
 
   return (
@@ -73,8 +80,8 @@ export default function GenerarInformeDiagnostico({ escuela }: { escuela: Escuel
       </div>
 
       {showModal && (
-        <Modal title="Informe generado" onClose={goToEscuelas}>
-          El informe en PDF quedó guardado en la lista de Informes de esta escuela; ábrelo desde ahí para verlo o descargarlo.
+        <Modal title="Informe generado" onClose={closeModal}>
+          El informe en PDF quedó guardado en la lista de Informes de esta escuela.
           {mensajeEstado && <p className="mt-2 font-medium">{mensajeEstado}</p>}
         </Modal>
       )}
