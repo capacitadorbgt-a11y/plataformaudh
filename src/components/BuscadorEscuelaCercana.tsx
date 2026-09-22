@@ -64,11 +64,19 @@ export default function BuscadorEscuelaCercana({
   const [pdvSeleccionado, setPdvSeleccionado] = useState<PdvUbicado | null>(null);
   const [mostrarLista, setMostrarLista] = useState(false);
 
+  // Puntos de venta que ya son escuela de formación (aparecen en /escuelas),
+  // para mostrarlos primero en las sugerencias de búsqueda.
+  const nombresEscuelas = useMemo(() => new Set(escuelas.map((e) => normalizarCiudad(e.nombre))), [escuelas]);
+
   const coincidencias = useMemo(() => {
     const q = normalizarCiudad(query);
     if (!q || q.length < 2) return [];
-    return pdvs.filter((p) => normalizarCiudad(p.nombre).includes(q)).slice(0, 8);
-  }, [query, pdvs]);
+    const esEscuela = (p: PdvUbicado) => nombresEscuelas.has(normalizarCiudad(p.nombre));
+    return pdvs
+      .filter((p) => normalizarCiudad(p.nombre).includes(q))
+      .sort((a, b) => Number(esEscuela(b)) - Number(esEscuela(a)))
+      .slice(0, 8);
+  }, [query, pdvs, nombresEscuelas]);
 
   const escuelasConCoordenadas = useMemo(
     () =>
@@ -138,7 +146,12 @@ export default function BuscadorEscuelaCercana({
                     }}
                     className="w-full text-left px-3 py-2 text-sm rounded-lg hover:bg-neutral-100"
                   >
-                    <div className="font-medium">{p.nombre}</div>
+                    <div className="font-medium flex items-center gap-1.5">
+                      {p.nombre}
+                      {nombresEscuelas.has(normalizarCiudad(p.nombre)) && (
+                        <span className="badge bg-udh-100 text-udh-700 text-[10px]">Escuela</span>
+                      )}
+                    </div>
                     {(p.ciudad || p.provincia) && (
                       <div className="text-xs text-neutral-400">
                         {[p.ciudad, p.provincia].filter(Boolean).join(" · ")}
