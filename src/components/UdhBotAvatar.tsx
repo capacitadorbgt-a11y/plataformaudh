@@ -1,10 +1,10 @@
 export type ExpresionBot = "feliz" | "neutral" | "pensando" | "confundido";
 
 const BOCAS: Record<ExpresionBot, string> = {
-  feliz: "M22 38 Q32 48 42 38",
-  neutral: "M24 40 L40 40",
-  pensando: "M28 40 A4 4 0 1 0 28 40.1",
-  confundido: "M23 41 Q28 36 33 41 T43 41",
+  feliz: "M23 47 Q32 55 41 47",
+  neutral: "M25 48 L39 48",
+  pensando: "M29 48 A3.4 3.4 0 1 0 29 48.1",
+  confundido: "M24 49 Q29 44 33 49 T42 49",
 };
 
 export default function UdhBotAvatar({
@@ -16,51 +16,43 @@ export default function UdhBotAvatar({
   size?: number;
   className?: string;
 }) {
-  const ojoIzq = expresion === "confundido" ? { r: 2.4, cy: 27 } : { r: 3.2, cy: 26 };
-  const ojoDer = expresion === "confundido" ? { r: 4, cy: 25 } : { r: 3.2, cy: 26 };
+  const ojosDesviados = expresion === "confundido";
 
   return (
     <svg
-      viewBox="0 0 64 70"
+      viewBox="0 0 64 80"
       width={size}
-      height={size}
+      height={(size * 80) / 64}
       className={className}
       role="img"
       aria-label={`UDH Bot, expresión ${expresion}`}
     >
-      {/* Antena */}
-      <line x1="32" y1="4" x2="32" y2="12" stroke="#c2410c" strokeWidth="2" strokeLinecap="round" />
-      <circle cx="32" cy="4" r="3" fill="#f97316" />
+      {/* Orejas / antenas redondeadas */}
+      <circle cx="14" cy="10" r="6" fill="#c2410c" />
+      <circle cx="50" cy="10" r="6" fill="#c2410c" />
+      <circle cx="14" cy="10" r="3" fill="#fdba74" />
+      <circle cx="50" cy="10" r="3" fill="#fdba74" />
 
-      {/* Emblema tipo "scoop" (inspirado en el logo de la U del Helado) */}
-      <circle cx="27" cy="11" r="4.2" fill="#fed7aa" />
-      <circle cx="37" cy="11" r="4.2" fill="#fdba74" />
-      <circle cx="32" cy="8" r="4.6" fill="#fff7ed" />
+      {/* Cuerpo (torso pequeño) */}
+      <rect x="14" y="52" width="36" height="24" rx="14" fill="#1e3a63" />
+      <circle cx="32" cy="64" r="4" fill="#f97316" />
 
       {/* Cabeza */}
-      <rect x="6" y="14" width="52" height="46" rx="18" fill="#172b4c" />
-      <rect x="6" y="14" width="52" height="46" rx="18" fill="url(#udhBotGradiente)" fillOpacity="0.25" />
+      <rect x="4" y="6" width="56" height="52" rx="24" fill="#172b4c" />
 
-      {/* Pantalla facial */}
-      <rect x="14" y="22" width="36" height="30" rx="12" fill="#0b1a30" />
+      {/* Visor / antifaz */}
+      <rect x="13" y="26" width="38" height="16" rx="8" fill="#fff7ed" />
 
       {/* Ojos */}
-      <circle cx="24" cy={ojoIzq.cy} r={ojoIzq.r} fill="#fdba74" />
-      <circle cx="40" cy={ojoDer.cy} r={ojoDer.r} fill="#fdba74" />
+      <circle cx={ojosDesviados ? 23 : 24} cy={ojosDesviados ? 32 : 34} r="4" fill="#172b4c" />
+      <circle cx={ojosDesviados ? 42 : 40} cy={ojosDesviados ? 35 : 34} r="4" fill="#172b4c" />
 
       {/* Boca */}
-      <path d={BOCAS[expresion]} stroke="#fdba74" strokeWidth="2.4" strokeLinecap="round" fill="none" />
+      <path d={BOCAS[expresion]} stroke="#fdba74" strokeWidth="2.6" strokeLinecap="round" fill="none" />
 
-      {/* Orejas / laterales */}
-      <rect x="1" y="30" width="6" height="14" rx="3" fill="#c2410c" />
-      <rect x="57" y="30" width="6" height="14" rx="3" fill="#c2410c" />
-
-      <defs>
-        <linearGradient id="udhBotGradiente" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#ffffff" />
-          <stop offset="1" stopColor="#000000" stopOpacity="0" />
-        </linearGradient>
-      </defs>
+      {/* Mejillas */}
+      <circle cx="12" cy="42" r="2.6" fill="#f97316" fillOpacity="0.55" />
+      <circle cx="52" cy="42" r="2.6" fill="#f97316" fillOpacity="0.55" />
     </svg>
   );
 }
