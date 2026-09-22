@@ -71,6 +71,28 @@ export async function createUsuario(formData: FormData) {
   return { error: null };
 }
 
+export async function updateUsuarioPassword(userId: string, formData: FormData) {
+  const { user: admin } = await requireAdmin();
+
+  const password = toNullableStr(formData.get("password"));
+  if (!password || password.length < 8) {
+    return { error: "La contraseña debe tener al menos 8 caracteres" };
+  }
+
+  const adminClient = createAdminClient();
+  const { error } = await adminClient.auth.admin.updateUserById(userId, { password });
+
+  if (error) return { error: error.message };
+
+  await logAudit(admin.id, "cambiar_password", {
+    entidad: "usuario",
+    entidadId: userId,
+  });
+
+  revalidatePath("/usuarios");
+  return { error: null };
+}
+
 export async function toggleUsuarioActivo(userId: string, activo: boolean) {
   const { user: admin } = await requireAdmin();
 

@@ -66,6 +66,7 @@ export default async function AuditoriaPage({
     "crear_usuario",
     "cambiar_rol",
     "cambiar_permisos",
+    "cambiar_password",
     "activar_usuario",
     "desactivar_usuario",
   ];

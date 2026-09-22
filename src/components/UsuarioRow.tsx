@@ -1,7 +1,7 @@
 "use client";
 
-import { useTransition } from "react";
-import { updateUserRole, toggleUsuarioActivo, updateUsuarioPermisos } from "@/app/(app)/usuarios/actions";
+import { useState, useTransition } from "react";
+import { updateUserRole, toggleUsuarioActivo, updateUsuarioPermisos, updateUsuarioPassword } from "@/app/(app)/usuarios/actions";
 import { useSaveWithModal } from "@/lib/useSaveWithModal";
 import type { Profile } from "@/types/database";
 
@@ -14,10 +14,19 @@ export default function UsuarioRow({
 }) {
   const rol = useSaveWithModal();
   const permisos = useSaveWithModal();
+  const password = useSaveWithModal();
   const [isToggling, startToggle] = useTransition();
+  const [mostrarPassword, setMostrarPassword] = useState(false);
 
   function handleRolSubmit(formData: FormData) {
     rol.run(() => updateUserRole(usuario.id, formData));
+  }
+
+  function handlePasswordSubmit(formData: FormData) {
+    password.run(
+      () => updateUsuarioPassword(usuario.id, formData),
+      () => setMostrarPassword(false)
+    );
   }
 
   function handlePermisosSubmit(formData: FormData) {
@@ -94,6 +103,43 @@ export default function UsuarioRow({
         >
           {isToggling ? "..." : usuario.activo ? "Desactivar acceso" : "Activar acceso"}
         </button>
+
+        <div className="mt-2">
+          {!mostrarPassword ? (
+            <button
+              type="button"
+              onClick={() => setMostrarPassword(true)}
+              className="text-xs text-udh-600 hover:underline"
+            >
+              Cambiar contraseña
+            </button>
+          ) : (
+            <form action={handlePasswordSubmit} className="space-y-1">
+              <input
+                className="input text-xs py-1"
+                type="password"
+                name="password"
+                placeholder="Nueva contraseña (mín. 8)"
+                minLength={8}
+                required
+                autoFocus
+              />
+              <div className="flex gap-2">
+                <button type="submit" disabled={password.isPending} className="btn-secondary text-xs disabled:opacity-50">
+                  {password.isPending ? "..." : "Guardar"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMostrarPassword(false)}
+                  className="text-xs text-neutral-400 hover:underline"
+                >
+                  Cancelar
+                </button>
+              </div>
+              {password.error && <p className="text-xs text-red-600">{password.error}</p>}
+            </form>
+          )}
+        </div>
       </td>
     </tr>
   );
