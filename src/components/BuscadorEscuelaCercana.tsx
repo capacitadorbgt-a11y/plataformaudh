@@ -89,12 +89,25 @@ export default function BuscadorEscuelaCercana({
   const resultado = useMemo(() => {
     if (!pdvSeleccionado) return null;
 
+    // Solo se sugieren escuelas habilitadas para capacitar: activas o en
+    // revisión. Las inactivas quedan fuera de las sugerencias.
+    const habilitadas = (estado: string) => estado === "ACTIVO" || estado === "REVISION";
+    const ciudadPdv = normalizarCiudad(pdvSeleccionado.ciudad);
     const coordsPdv = coordenadasDeCiudad(pdvSeleccionado.ciudad);
 
     if (coordsPdv) {
       const ordenadas = escuelasConCoordenadas
-        .map(({ escuela, coords }) => ({ escuela, km: distanciaKm(coordsPdv, coords) }))
-        .sort((a, b) => a.km - b.km);
+        .filter(({ escuela }) => habilitadas(escuela.estado))
+        .map(({ escuela, coords }) => ({
+          escuela,
+          km: distanciaKm(coordsPdv, coords),
+          mismaCiudad: normalizarCiudad(escuela.ciudad) === ciudadPdv,
+        }))
+        .sort((a, b) => {
+          // Misma ciudad del PDV siempre primero, luego por cercanía.
+          if (a.mismaCiudad !== b.mismaCiudad) return a.mismaCiudad ? -1 : 1;
+          return a.km - b.km;
+        });
       return { sugerencias: ordenadas.slice(0, 3) as Sugerencia[], coordsPdv, aproximado: false };
     }
 
@@ -102,7 +115,7 @@ export default function BuscadorEscuelaCercana({
     // cualquier escuela registrada en la misma provincia, sin distancia.
     const provincia = normalizarCiudad(pdvSeleccionado.provincia);
     const mismaProvincia = escuelas
-      .filter((e) => provincia && normalizarCiudad(e.provincia) === provincia)
+      .filter((e) => habilitadas(e.estado) && provincia && normalizarCiudad(e.provincia) === provincia)
       .slice(0, 3)
       .map((escuela) => ({ escuela, km: null as number | null }));
     return { sugerencias: mismaProvincia, coordsPdv: null, aproximado: true };
