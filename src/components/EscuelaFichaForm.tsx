@@ -14,7 +14,7 @@ export default function EscuelaFichaForm({ escuela }: { escuela: Escuela }) {
 
   return (
     <>
-      <form action={handleSubmit} className="grid sm:grid-cols-2 gap-4">
+      <form key={escuela.updated_at} action={handleSubmit} className="grid sm:grid-cols-2 gap-4">
         <div>
           <label className="label">Provincia</label>
           <input className="input" name="provincia" defaultValue={escuela.provincia ?? ""} />
