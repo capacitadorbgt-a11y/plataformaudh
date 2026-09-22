@@ -2,7 +2,13 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { coordenadasDeCiudad, distanciaKm, LIMITES_ECUADOR_CONTINENTAL, normalizarCiudad } from "@/lib/geoEcuador";
+import {
+  coordenadasDeCiudad,
+  distanciaKm,
+  LIMITES_ECUADOR_CONTINENTAL,
+  normalizarCiudad,
+  SILUETA_ECUADOR,
+} from "@/lib/geoEcuador";
 
 export interface PdvUbicado {
   nombre: string;
@@ -26,12 +32,26 @@ interface Sugerencia {
 const NAVY = "#172b4c";
 const ORANGE = "#ea580c";
 
+// El viewBox respeta la proporcion real lat/lng del territorio (Ecuador es
+// mas alto que ancho) para que la silueta no salga distorsionada.
+const ANCHO_MAPA = 100;
+const ALTO_MAPA =
+  ANCHO_MAPA *
+  ((LIMITES_ECUADOR_CONTINENTAL.latMax - LIMITES_ECUADOR_CONTINENTAL.latMin) /
+    (LIMITES_ECUADOR_CONTINENTAL.lngMax - LIMITES_ECUADOR_CONTINENTAL.lngMin));
+
 function proyectar(lat: number, lng: number) {
   const { latMin, latMax, lngMin, lngMax } = LIMITES_ECUADOR_CONTINENTAL;
-  const x = ((lng - lngMin) / (lngMax - lngMin)) * 100;
-  const y = ((latMax - lat) / (latMax - latMin)) * 100;
+  const x = ((lng - lngMin) / (lngMax - lngMin)) * ANCHO_MAPA;
+  const y = ((latMax - lat) / (latMax - latMin)) * ALTO_MAPA;
   return { x, y };
 }
+
+const SILUETA_PATH =
+  SILUETA_ECUADOR.map(([lng, lat], i) => {
+    const p = proyectar(lat, lng);
+    return `${i === 0 ? "M" : "L"}${p.x.toFixed(2)},${p.y.toFixed(2)}`;
+  }).join(" ") + " Z";
 
 export default function BuscadorEscuelaCercana({
   pdvs,
@@ -210,13 +230,14 @@ function MapaEcuador({
 
   return (
     <div className="rounded-xl border border-neutral-100 bg-neutral-50 p-3">
-      <svg viewBox="0 0 100 130" className="w-full h-auto" role="img" aria-label="Mapa referencial de Ecuador">
-        <rect x="0" y="0" width="34" height="130" fill="#eaf2ee" />
-        <rect x="34" y="0" width="33" height="130" fill="#f3efe4" />
-        <rect x="67" y="0" width="33" height="130" fill="#eaf0f8" />
-        <text x="50" y="10" textAnchor="middle" fontSize="4" fill="#9ca3af" fontWeight="600">
-          ECUADOR
-        </text>
+      <div className="text-[10px] font-semibold tracking-wide text-neutral-400 mb-1">ECUADOR</div>
+      <svg
+        viewBox={`0 0 ${ANCHO_MAPA} ${ALTO_MAPA.toFixed(2)}`}
+        className="w-full h-auto"
+        role="img"
+        aria-label="Mapa referencial de Ecuador"
+      >
+        <path d={SILUETA_PATH} fill="#eaf0f8" stroke="#b9c6db" strokeWidth="0.5" strokeLinejoin="round" />
 
         {escuelas.map(({ escuela, coords }) => {
           const p = proyectar(coords.lat, coords.lng);
