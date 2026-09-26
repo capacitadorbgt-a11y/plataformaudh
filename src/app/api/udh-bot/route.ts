@@ -1,0 +1,215 @@
+import { NextResponse } from "next/server";
+import { requireUser } from "@/lib/auth";
+import { createClient } from "@/lib/supabase/server";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Profile } from "@/types/database";
+
+export const runtime = "nodejs";
+
+const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
+const MODELO = "llama-3.3-70b-versatile";
+
+const SYSTEM_PROMPT = `Eres UDH Bot, el asistente de la Plataforma UDH (Universidad del Helado), el sistema interno
+que usa Bogati Helados con Queso para gestionar sus escuelas de formación de personal a nivel nacional en Ecuador.
+
+Responde siempre en español, de forma clara, breve y concreta (2-5 frases salvo que te pidan un resumen o
+explicación más larga). No inventes datos: si necesitas una cifra real (conteos, listados), usa las herramientas
+disponibles; si no hay herramienta para lo que preguntan, dilo con honestidad.
+
+GUÍA DE USO DE LA PLATAFORMA (para preguntas de "cómo hago...", responde con esto como base):
+
+- Panel (inicio, "/"): estadísticas generales, buscador de escuela más cercana según un punto de venta (respeta
+  el estado ACTIVO/REVISION de las escuelas y prioriza la misma ciudad), gráfico de capacitaciones por escuela,
+  seguimientos en proceso con demora (+3 días) y seguimiento de permanencia (3 a 6 meses tras el ingreso).
+- Escuelas ("/escuelas"): lista de escuelas de formación con filtros por nombre/ciudad/estado y exportar a
+  Excel/CSV/PDF. Solo Admin UDH crea escuelas nuevas ("+ Nueva escuela"). Al entrar a la ficha de una escuela se
+  edita provincia/ciudad/zona/capacidad/estado/observaciones, se administran sus Colaboradores (Admin/Polifuncional;
+  cédula y datos bancarios solo visibles para Admin UDH), sus Informes (botón "Generar informe" sube un Excel de
+  diagnóstico con pestañas DIAGNOSTICO/PLAN/FOTOS y arma un PDF de cumplimiento que se autoguarda; botón
+  "+ Agregar informe" sube un PDF ya elaborado; en ambos casos, si el informe indica que el PDV está apto o no apto
+  para ser Escuela de Formación, el estado de la escuela se actualiza a Activo o Inactivo respectivamente), y sus
+  Recompensas/Entregas.
+- Seguimientos ("/seguimientos"): registro de reclutamiento/capacitación por PDV. "+ Nuevo seguimiento" para crear
+  uno; filtros por fecha, escuela, capacitador y PDV solicitud; se puede editar cada fila y exportar la tabla.
+  Estado del proceso: En proceso / Finalizado.
+- Recompensas y material ("/entregas"): registro de camisetas, entradas de cine, cheques, pagos u otro material
+  entregado a una escuela; se crea y se edita desde ahí o desde la ficha de la escuela.
+- Encuestas ("/encuestas"): satisfacción de aspirantes/colaboradores con la capacitación recibida.
+- Usuarios ("/usuarios", solo Admin UDH): crear cuentas, asignar rol (Admin UDH / Analista), activar o desactivar
+  el acceso, cambiar la contraseña de un usuario, y marcar qué herramientas puede usar cada uno.
+- Auditoría ("/auditoria", solo Admin UDH): quién hizo qué y cuándo (inicios de sesión, altas/ediciones/borrados),
+  filtrable por usuario, acción y fecha.
+- Roles: Admin UDH tiene acceso completo (ve datos sensibles de colaboradores, administra usuarios, elimina
+  registros). Analista trabaja solo con las herramientas que se le habiliten, sin ver datos bancarios/cédula ni
+  administrar usuarios.
+
+Si tu respuesta se beneficia de llevar al usuario a una sección, termina con un enlace en su propia línea, en este
+formato EXACTO: [Texto del enlace](/ruta). Usa solo estas rutas reales: / , /escuelas , /seguimientos , /entregas ,
+/encuestas , /usuarios , /auditoria. No inventes otras rutas ni pongas el enlace si no aporta.`;
+
+const HERRAMIENTAS = [
+  {
+    type: "function",
+    function: {
+      name: "contar_escuelas",
+      description: "Cuenta cuántas escuelas de formación hay registradas, opcionalmente filtradas por estado.",
+      parameters: {
+        type: "object",
+        properties: {
+          estado: { type: "string", enum: ["ACTIVO", "REVISION", "INACTIVO"], description: "Filtrar por estado (opcional)" },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "contar_seguimientos",
+      description: "Cuenta cuántos seguimientos de reclutamiento/capacitación hay registrados, opcionalmente por estado del proceso.",
+      parameters: {
+        type: "object",
+        properties: {
+          estado_proceso: { type: "string", enum: ["EN_PROCESO", "FINALIZADO"], description: "Filtrar por estado del proceso (opcional)" },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "contar_entregas",
+      description: "Cuenta cuántas entregas/recompensas hay registradas en total.",
+      parameters: { type: "object", properties: {} },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "buscar_escuelas",
+      description: "Busca escuelas por coincidencia de nombre o ciudad y devuelve hasta 5 resultados con su estado y procesos.",
+      parameters: {
+        type: "object",
+        properties: { texto: { type: "string", description: "Texto a buscar en el nombre o la ciudad" } },
+        required: ["texto"],
+      },
+    },
+  },
+] as const;
+
+type Rol = { role: "system" | "user" | "assistant" | "tool"; content: string; tool_call_id?: string; tool_calls?: unknown };
+
+async function ejecutarHerramienta(
+  nombre: string,
+  args: Record<string, unknown>,
+  supabase: SupabaseClient,
+  perfil: Profile
+): Promise<unknown> {
+  switch (nombre) {
+    case "contar_escuelas": {
+      let query = supabase.from("escuelas").select("*", { count: "exact", head: true });
+      if (typeof args.estado === "string") query = query.eq("estado", args.estado);
+      const { count, error } = await query;
+      if (error) return { error: error.message };
+      return { total: count ?? 0 };
+    }
+    case "contar_seguimientos": {
+      let query = supabase.from("seguimientos").select("*", { count: "exact", head: true });
+      if (typeof args.estado_proceso === "string") query = query.eq("estado_proceso", args.estado_proceso);
+      const { count, error } = await query;
+      if (error) return { error: error.message };
+      return { total: count ?? 0 };
+    }
+    case "contar_entregas": {
+      const { count, error } = await supabase.from("entregas").select("*", { count: "exact", head: true });
+      if (error) return { error: error.message };
+      return { total: count ?? 0 };
+    }
+    case "buscar_escuelas": {
+      const texto = typeof args.texto === "string" ? args.texto : "";
+      const { data, error } = await supabase
+        .from("escuelas")
+        .select("nombre, ciudad, estado, procesos_completados")
+        .or(`nombre.ilike.%${texto}%,ciudad.ilike.%${texto}%`)
+        .limit(5);
+      if (error) return { error: error.message };
+      return { resultados: data };
+    }
+    case "mi_perfil":
+      return { nombre: perfil.nombre, rol: perfil.role };
+    default:
+      return { error: `Herramienta desconocida: ${nombre}` };
+  }
+}
+
+async function llamarGroq(mensajes: Rol[], apiKey: string) {
+  const respuesta = await fetch(GROQ_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+    body: JSON.stringify({
+      model: MODELO,
+      messages: mensajes,
+      tools: HERRAMIENTAS,
+      tool_choice: "auto",
+      temperature: 0.3,
+      max_tokens: 700,
+    }),
+  });
+
+  if (!respuesta.ok) {
+    const texto = await respuesta.text();
+    throw new Error(`Groq respondió ${respuesta.status}: ${texto.slice(0, 300)}`);
+  }
+
+  const datos = await respuesta.json();
+  return datos.choices?.[0]?.message as {
+    role: string;
+    content: string | null;
+    tool_calls?: { id: string; function: { name: string; arguments: string } }[];
+  };
+}
+
+export async function POST(req: Request) {
+  const apiKey = process.env.GROQ_API_KEY;
+  if (!apiKey) {
+    return NextResponse.json({ error: "GROQ_API_KEY no configurada" }, { status: 501 });
+  }
+
+  const { profile } = await requireUser();
+  const supabase = createClient();
+
+  const body = await req.json().catch(() => null);
+  const historial: Rol[] = Array.isArray(body?.mensajes) ? body.mensajes : [];
+  if (historial.length === 0) {
+    return NextResponse.json({ error: "Falta el mensaje" }, { status: 400 });
+  }
+
+  const mensajes: Rol[] = [{ role: "system", content: SYSTEM_PROMPT }, ...historial];
+
+  try {
+    let mensaje = await llamarGroq(mensajes, apiKey);
+    let vueltas = 0;
+
+    while (mensaje.tool_calls && mensaje.tool_calls.length > 0 && vueltas < 3) {
+      mensajes.push({ role: "assistant", content: mensaje.content ?? "", tool_calls: mensaje.tool_calls });
+      for (const llamada of mensaje.tool_calls) {
+        let args: Record<string, unknown> = {};
+        try {
+          args = JSON.parse(llamada.function.arguments || "{}");
+        } catch {
+          // argumentos invalidos: se ejecuta con {} por defecto
+        }
+        const resultado = await ejecutarHerramienta(llamada.function.name, args, supabase, profile);
+        mensajes.push({ role: "tool", tool_call_id: llamada.id, content: JSON.stringify(resultado) });
+      }
+      mensaje = await llamarGroq(mensajes, apiKey);
+      vueltas++;
+    }
+
+    return NextResponse.json({ texto: mensaje.content ?? "No pude generar una respuesta." });
+  } catch (err) {
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "Error al consultar la IA" },
+      { status: 502 }
+    );
+  }
+}

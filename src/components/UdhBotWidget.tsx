@@ -39,9 +39,22 @@ export default function UdhBotWidget({ perfil }: { perfil: PerfilBot }) {
     setTimeout(() => setExpresion("neutral"), 4000);
   }
 
+  // El modelo puede cerrar su respuesta con un enlace en formato markdown
+  // ("[Ir a Escuelas](/escuelas)"); se extrae para renderizarlo como Link.
+  function extraerEnlace(texto: string): { texto: string; enlace?: { href: string; texto: string } } {
+    const match = texto.match(/\n?\[([^\]]+)\]\((\/[^\s)]*)\)\s*$/);
+    if (!match) return { texto };
+    return { texto: texto.slice(0, match.index).trim(), enlace: { texto: match[1], href: match[2] } };
+  }
+
   async function enviar(preguntaTexto: string) {
     const pregunta = preguntaTexto.trim();
     if (!pregunta || cargando) return;
+
+    const historialPrevio = mensajes.map((m) => ({
+      role: m.autor === "usuario" ? "user" : "assistant",
+      content: m.texto,
+    }));
 
     setMensajes((m) => [...m, { autor: "usuario", texto: pregunta }]);
     setInput("");
@@ -50,21 +63,44 @@ export default function UdhBotWidget({ perfil }: { perfil: PerfilBot }) {
     desplazarAbajo();
 
     try {
-      const resultado = await responderPregunta(pregunta, supabase, perfil);
+      let respuestaBot: Mensaje | null = null;
 
-      let respuestaBot: Mensaje;
-      if (resultado.tipo === "sin_match" || !resultado.respuesta) {
-        respuestaBot = {
-          autor: "bot",
-          texto:
-            "No encontré una respuesta exacta para eso todavía. Prueba con una de estas preguntas, o reformula tu duda:",
-        };
-        marcarExpresionTemporal("confundido");
-      } else {
-        respuestaBot = { autor: "bot", texto: resultado.respuesta.texto, enlace: resultado.respuesta.enlace };
-        marcarExpresionTemporal("feliz");
+      // Se intenta primero con la IA (Groq); si no esta configurada o falla,
+      // se cae de forma silenciosa al asistente basado en palabras clave.
+      try {
+        const r = await fetch("/api/udh-bot", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ mensajes: [...historialPrevio, { role: "user", content: pregunta }] }),
+        });
+        if (r.ok) {
+          const datos = await r.json();
+          if (typeof datos.texto === "string" && datos.texto.trim()) {
+            const { texto, enlace } = extraerEnlace(datos.texto.trim());
+            respuestaBot = { autor: "bot", texto, enlace };
+          }
+        }
+      } catch {
+        // sin conexion a la IA: sigue el respaldo de abajo
       }
-      setMensajes((m) => [...m, respuestaBot]);
+
+      let sinRespuesta = false;
+      if (!respuestaBot) {
+        const resultado = await responderPregunta(pregunta, supabase, perfil);
+        if (resultado.tipo === "sin_match" || !resultado.respuesta) {
+          sinRespuesta = true;
+          respuestaBot = {
+            autor: "bot",
+            texto:
+              "No encontré una respuesta exacta para eso todavía. Prueba con una de estas preguntas, o reformula tu duda:",
+          };
+        } else {
+          respuestaBot = { autor: "bot", texto: resultado.respuesta.texto, enlace: resultado.respuesta.enlace };
+        }
+      }
+
+      marcarExpresionTemporal(sinRespuesta ? "confundido" : "feliz");
+      setMensajes((m) => [...m, respuestaBot as Mensaje]);
     } finally {
       setCargando(false);
       desplazarAbajo();
