@@ -103,6 +103,7 @@ export default function UdhBotWidget({ perfil }: { perfil: PerfilBot }) {
                   {m.enlace && (
                     <Link
                       href={m.enlace.href}
+                      onClick={() => setAbierto(false)}
                       className={`inline-block mt-1.5 text-xs font-medium hover:underline ${
                         m.autor === "usuario" ? "text-white" : "text-udh-600"
                       }`}
