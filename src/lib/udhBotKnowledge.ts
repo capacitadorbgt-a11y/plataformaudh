@@ -90,12 +90,16 @@ export const TEMAS_FAQ: TemaFaq[] = [
   },
   {
     id: "informes-generar",
-    palabrasClave: ["generar informe", "informe de cumplimiento", "excel de diagnostico", "subir excel diagnostico"],
-    pregunta: "¿Cómo genero el informe de cumplimiento de una escuela?",
+    palabrasClave: [
+      "generar informe", "genero un informe", "genero informe", "generar un informe",
+      "informe de escuela", "informe de cumplimiento", "excel de diagnostico",
+      "subir excel diagnostico", "checklist",
+    ],
+    pregunta: "¿Cómo generar un informe de escuela?",
     respuesta:
-      "En la ficha de la escuela, sección Informes, pulsa 'Generar informe' y sube el Excel de diagnóstico (con las " +
-      "pestañas DIAGNOSTICO, PLAN y FOTOS). El sistema arma un PDF con el resumen de cumplimiento, el cruce de " +
-      "observaciones, conclusiones y recomendaciones, y lo guarda directo en la lista de Informes de esa escuela.",
+      "Ve a la sección Escuelas, elige la escuela a la que vas a subir el informe, en la sección Informes seleccionas " +
+      "Generar y cargas el checklist de Excel, y listo: tu informe será generado y autoguardado.",
+    enlace: { href: "/escuelas", texto: "Ir a Escuelas" },
   },
   {
     id: "informes-agregar",
@@ -117,11 +121,13 @@ export const TEMAS_FAQ: TemaFaq[] = [
   },
   {
     id: "seguimientos-crear",
-    palabrasClave: ["nuevo seguimiento", "crear seguimiento", "registrar aspirante", "registrar capacitacion"],
-    pregunta: "¿Cómo registro un nuevo seguimiento de reclutamiento/capacitación?",
+    palabrasClave: [
+      "nuevo seguimiento", "agrego un seguimiento", "agrego seguimiento", "agregar seguimiento",
+      "crear seguimiento", "registrar aspirante", "registrar capacitacion",
+    ],
+    pregunta: "¿Cómo agrego un seguimiento?",
     respuesta:
-      "Ve a Seguimientos y pulsa '+ Nuevo seguimiento'. Registra escuela, fecha de capacitación, aspirantes, cargo, " +
-      "PDV que solicita, analista, capacitador y estado del proceso (En proceso / Finalizado), entre otros campos.",
+      "Ve a la sección Seguimiento, selecciona la opción '+ Nuevo seguimiento' y agrega toda la información que necesites.",
     enlace: { href: "/seguimientos/nuevo", texto: "Ir a Nuevo seguimiento" },
   },
   {
