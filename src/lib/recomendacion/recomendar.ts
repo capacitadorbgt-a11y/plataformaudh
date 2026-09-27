@@ -190,7 +190,17 @@ export async function recomendarEscuela(solicitud: SolicitudRecomendacion): Prom
     };
   });
 
-  const ordenados = [...candidatos].sort((a, b) => b.score - a.score || a.km - b.km);
+  // Orden: primero las descalificadas (llenas/inactivas) al final, luego
+  // ACTIVO siempre antes que REVISION (preferencia explícita pedida por
+  // Bogati, no una simple penalización de puntaje), y recién dentro de cada
+  // grupo se compara por score y luego por cercanía.
+  const tierEstado = (c: CandidatoRecomendado) => (c.estado === "ACTIVO" ? 0 : 1);
+  const ordenados = [...candidatos].sort((a, b) => {
+    if (a.descalificada !== b.descalificada) return a.descalificada ? 1 : -1;
+    const tierDiff = tierEstado(a) - tierEstado(b);
+    if (tierDiff !== 0) return tierDiff;
+    return b.score - a.score || a.km - b.km;
+  });
   let mejor: CandidatoRecomendado | null = ordenados[0] ?? null;
 
   // Si hasta la mejor opción está descalificada (todas llenas en esa

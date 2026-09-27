@@ -15,9 +15,6 @@ export const PESOS = {
 const MIN_REFERENCIA = 180;
 // Con 3 o más cupos libres el componente de cupos ya vale el máximo.
 const CUPOS_REFERENCIA = 3;
-// Penalización suave (no descalifica) para escuelas en revisión, para que
-// una ACTIVO con métricas similares siempre quede primero.
-const FACTOR_REVISION = 0.85;
 
 export interface DatosParaScore {
   escuelaId: string;
@@ -49,14 +46,16 @@ export function scoreEscuela(datos: DatosParaScore): ResultadoScore {
   const scoreAprobacion = datos.tasaAprobacion ?? 0.5;
   const scoreNps = datos.nps == null ? 0.5 : (datos.nps + 100) / 200;
 
-  let score =
+  const score =
     PESOS.tiempo * scoreTiempo +
     PESOS.cupos * scoreCupos +
     PESOS.sinDemoras * scoreSinDemoras +
     PESOS.aprobacion * scoreAprobacion +
     PESOS.nps * scoreNps;
 
-  if (datos.estado === "REVISION") score *= FACTOR_REVISION;
-
+  // El estado (ACTIVO antes que REVISION) no se mezcla aquí: es un criterio
+  // de orden aparte que aplica recomendarEscuela() antes de comparar score,
+  // para que una ACTIVO nunca pierda frente a una REVISION sin importar
+  // cuánto más alto salga el puntaje de esta última.
   return { escuelaId: datos.escuelaId, score, descalificada: false };
 }
