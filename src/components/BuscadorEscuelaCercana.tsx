@@ -17,6 +17,41 @@ interface ResultadoRutaApi {
   aproximado: boolean;
 }
 
+type Semaforo = "verde" | "amarillo" | "rojo";
+
+interface CandidatoRecomendadoApi {
+  escuelaId: string;
+  nombre: string;
+  ciudad: string | null;
+  estado: string;
+  km: number;
+  min: number;
+  aproximado: boolean;
+  cuposLibres: number | null;
+  hayDemoras: boolean;
+  semaforo: Semaforo;
+  proximaFechaLibre: string | null;
+  score: number;
+  descalificada: boolean;
+}
+
+interface RecomendacionApi {
+  pdvResuelto: { nombre: string; ciudad: string | null } | null;
+  recomendada: CandidatoRecomendadoApi | null;
+  alternativas: CandidatoRecomendadoApi[];
+  explicacion: string;
+  agrupamiento: { escuelaNombre: string; pdvCercano: string; fecha: string } | null;
+  sinCoordenadas: string[];
+  error?: string;
+}
+
+const EMOJI_SEMAFORO: Record<Semaforo, string> = { verde: "🟢", amarillo: "🟡", rojo: "🔴" };
+
+function formatoCortoFecha(fechaISO: string): string {
+  const [anio, mes, dia] = fechaISO.split("-");
+  return `${dia}/${mes}/${anio}`;
+}
+
 export interface PdvUbicado {
   nombre: string;
   ciudad: string | null;
@@ -77,6 +112,11 @@ export default function BuscadorEscuelaCercana({
   const [query, setQuery] = useState("");
   const [pdvSeleccionado, setPdvSeleccionado] = useState<PdvUbicado | null>(null);
   const [mostrarLista, setMostrarLista] = useState(false);
+  const [fecha, setFecha] = useState("");
+  const [cargo, setCargo] = useState("");
+  const [aspirantes, setAspirantes] = useState("");
+  const [recomendacion, setRecomendacion] = useState<RecomendacionApi | null>(null);
+  const [cargandoRecomendacion, setCargandoRecomendacion] = useState(false);
 
   // Puntos de venta que ya son escuela de formación (aparecen en /escuelas),
   // para mostrarlos primero en las sugerencias de búsqueda.
@@ -175,6 +215,41 @@ export default function BuscadorEscuelaCercana({
     };
   }, [candidatos, pdvSeleccionado?.ciudad]);
 
+  // Si además del PDV se indica una fecha tentativa, se pide una
+  // recomendación real (combina tiempo de viaje, cupos y demoras) en vez de
+  // solo ordenar por distancia.
+  useEffect(() => {
+    setRecomendacion(null);
+    if (!pdvSeleccionado || !fecha) return;
+
+    let cancelado = false;
+    setCargandoRecomendacion(true);
+    fetch("/api/recomendacion-escuela", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        pdv: pdvSeleccionado.nombre,
+        fecha,
+        cargo: cargo.trim() || null,
+        aspirantes: aspirantes.trim() ? Number(aspirantes) : null,
+      }),
+    })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((datos: RecomendacionApi | null) => {
+        if (!cancelado && datos) setRecomendacion(datos);
+      })
+      .catch(() => {
+        // Sin conexión al endpoint: se mantiene la vista por distancia.
+      })
+      .finally(() => {
+        if (!cancelado) setCargandoRecomendacion(false);
+      });
+
+    return () => {
+      cancelado = true;
+    };
+  }, [pdvSeleccionado, fecha, cargo, aspirantes]);
+
   const resultado = useMemo(() => {
     if (!candidatos) return null;
 
@@ -266,7 +341,118 @@ export default function BuscadorEscuelaCercana({
             </p>
           )}
 
-          {pdvSeleccionado && resultado && (
+          {pdvSeleccionado && (
+            <div className="grid grid-cols-3 gap-2 mt-3">
+              <div>
+                <label className="text-[10px] text-neutral-400">Fecha tentativa</label>
+                <input className="input text-sm" type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} />
+              </div>
+              <div>
+                <label className="text-[10px] text-neutral-400">Cargo</label>
+                <input
+                  className="input text-sm"
+                  placeholder="ADM, PTC, POLI..."
+                  value={cargo}
+                  onChange={(e) => setCargo(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="text-[10px] text-neutral-400">Aspirantes</label>
+                <input
+                  className="input text-sm"
+                  type="number"
+                  min={1}
+                  value={aspirantes}
+                  onChange={(e) => setAspirantes(e.target.value)}
+                />
+              </div>
+            </div>
+          )}
+          {pdvSeleccionado && !fecha && (
+            <p className="text-[11px] text-neutral-400 mt-1">
+              Indica una fecha para recibir una recomendación real (combina tiempo de viaje, cupos y demoras), no
+              solo la distancia.
+            </p>
+          )}
+
+          {pdvSeleccionado && fecha && (
+            <div className="mt-4 space-y-3">
+              {cargandoRecomendacion && !recomendacion && (
+                <p className="text-sm text-neutral-400">Calculando la mejor recomendación…</p>
+              )}
+
+              {recomendacion?.error && (
+                <p className="text-xs text-amber-600">{recomendacion.explicacion}</p>
+              )}
+
+              {recomendacion?.recomendada && (
+                <>
+                  <Link
+                    href={`/escuelas/${recomendacion.recomendada.escuelaId}`}
+                    className="block border-2 border-udh-500 bg-udh-50 rounded-xl px-4 py-3 hover:bg-udh-100"
+                  >
+                    <div className="text-xs text-udh-700 font-medium uppercase tracking-wide flex items-center gap-1.5">
+                      Escuela recomendada
+                      <span className="text-sm" title={`Disponibilidad: ${recomendacion.recomendada.semaforo}`}>
+                        {EMOJI_SEMAFORO[recomendacion.recomendada.semaforo]}
+                      </span>
+                    </div>
+                    <div className="font-semibold text-neutral-800">{recomendacion.recomendada.nombre}</div>
+                    <div className="text-xs text-neutral-500">
+                      {recomendacion.recomendada.ciudad ?? "—"} · ~{Math.round(recomendacion.recomendada.km)} km · ~
+                      {Math.round(recomendacion.recomendada.min)} min
+                      {recomendacion.recomendada.cuposLibres != null &&
+                        ` · ${recomendacion.recomendada.cuposLibres} cupo${recomendacion.recomendada.cuposLibres === 1 ? "" : "s"} libre${recomendacion.recomendada.cuposLibres === 1 ? "" : "s"}`}
+                    </div>
+                  </Link>
+
+                  <p className="text-sm text-neutral-600 italic">{recomendacion.explicacion}</p>
+
+                  {recomendacion.recomendada.cuposLibres === 0 && recomendacion.recomendada.proximaFechaLibre && (
+                    <p className="text-xs text-amber-700 bg-amber-50 rounded-lg px-3 py-2">
+                      Se libera un cupo el {formatoCortoFecha(recomendacion.recomendada.proximaFechaLibre)}.
+                    </p>
+                  )}
+
+                  {recomendacion.agrupamiento && (
+                    <p className="text-xs text-udh-700 bg-udh-50 rounded-lg px-3 py-2">
+                      Oportunidad de agrupar: {recomendacion.agrupamiento.pdvCercano} ya tiene una capacitación el{" "}
+                      {formatoCortoFecha(recomendacion.agrupamiento.fecha)} en la misma escuela.
+                    </p>
+                  )}
+
+                  <Link
+                    href={`/seguimientos/nuevo?escuela_id=${recomendacion.recomendada.escuelaId}&fecha_capacitacion=${fecha}${cargo ? `&cargo=${encodeURIComponent(cargo)}` : ""}&pdv_solicitud=${encodeURIComponent(pdvSeleccionado.nombre)}`}
+                    className="btn-primary inline-block text-sm"
+                  >
+                    Crear seguimiento con esta escuela
+                  </Link>
+
+                  {recomendacion.alternativas.length > 0 && (
+                    <div className="space-y-1.5">
+                      <div className="text-xs text-neutral-400">Otras opciones:</div>
+                      {recomendacion.alternativas.map((a) => (
+                        <Link
+                          key={a.escuelaId}
+                          href={`/escuelas/${a.escuelaId}`}
+                          className="flex items-center justify-between text-sm px-3 py-1.5 rounded-lg hover:bg-neutral-50 border border-neutral-100"
+                        >
+                          <span className="flex items-center gap-1.5">
+                            <span className="text-xs">{EMOJI_SEMAFORO[a.semaforo]}</span> {a.nombre}
+                          </span>
+                          <span className="text-xs text-neutral-400 shrink-0 ml-2">
+                            ~{Math.round(a.km)} km · ~{Math.round(a.min)} min
+                          </span>
+                        </Link>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+
+          {pdvSeleccionado && !fecha && resultado && (
             <div className="mt-4 space-y-3">
               {resultado.sinCoordsPdv && (
                 <p className="text-xs text-amber-600">
@@ -326,7 +512,7 @@ export default function BuscadorEscuelaCercana({
         <MapaEcuador
           escuelas={escuelasConCoordenadas}
           pdvCoords={resultado?.coordsPdv ?? null}
-          cercanaId={masCercana?.escuela.id ?? null}
+          cercanaId={recomendacion?.recomendada?.escuelaId ?? masCercana?.escuela.id ?? null}
         />
       </div>
     </div>

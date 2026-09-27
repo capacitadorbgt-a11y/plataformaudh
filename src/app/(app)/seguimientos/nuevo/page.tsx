@@ -7,7 +7,7 @@ import type { Escuela } from "@/types/database";
 export default async function NuevoSeguimientoPage({
   searchParams,
 }: {
-  searchParams: { error?: string };
+  searchParams: { error?: string; escuela_id?: string; fecha_capacitacion?: string; cargo?: string; pdv_solicitud?: string };
 }) {
   const { user } = await requirePermiso("seguimientos");
   const supabase = createClient();
@@ -34,7 +34,7 @@ export default async function NuevoSeguimientoPage({
       <form action={createSeguimiento} className="card p-6 space-y-4">
         <div>
           <label className="label">Escuela</label>
-          <select className="input" name="escuela_id" defaultValue="">
+          <select className="input" name="escuela_id" defaultValue={searchParams.escuela_id ?? ""}>
             <option value="">— No está en la lista (escribir nombre abajo) —</option>
             {escuelas?.map((e) => (
               <option key={e.id} value={e.id}>{e.nombre}</option>
@@ -50,11 +50,11 @@ export default async function NuevoSeguimientoPage({
         <div className="grid sm:grid-cols-2 gap-4">
           <div>
             <label className="label">Fecha de capacitación</label>
-            <input className="input" type="date" name="fecha_capacitacion" />
+            <input className="input" type="date" name="fecha_capacitacion" defaultValue={searchParams.fecha_capacitacion ?? ""} />
           </div>
           <div>
             <label className="label">Cargo</label>
-            <input className="input" name="cargo" placeholder="ADM, PTC, PMT, POLI..." />
+            <input className="input" name="cargo" placeholder="ADM, PTC, PMT, POLI..." defaultValue={searchParams.cargo ?? ""} />
           </div>
         </div>
 
@@ -100,7 +100,12 @@ export default async function NuevoSeguimientoPage({
 
         <div>
           <label className="label">PDV solicitud (si no está en la lista)</label>
-          <input className="input" name="pdv_solicitud_libre" placeholder="Escribe el nombre del PDV" />
+          <input
+            className="input"
+            name="pdv_solicitud_libre"
+            placeholder="Escribe el nombre del PDV"
+            defaultValue={searchParams.pdv_solicitud ?? ""}
+          />
         </div>
 
         <div>
