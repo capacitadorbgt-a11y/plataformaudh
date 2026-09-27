@@ -3,6 +3,7 @@ import { requirePermiso } from "@/lib/auth";
 import Link from "next/link";
 import type { Escuela, Seguimiento } from "@/types/database";
 import SeguimientosTable from "@/components/SeguimientosTable";
+import ImportarSeguimientoModal from "@/components/ImportarSeguimientoModal";
 
 interface SeguimientosSearchParams {
   escuela_id?: string;
@@ -81,7 +82,10 @@ export default async function SeguimientosPage({
           <h1 className="text-xl font-bold">Seguimientos de reclutamiento y capacitación</h1>
           <p className="text-sm text-neutral-500">{seguimientos?.length ?? 0} registros</p>
         </div>
-        <Link href="/seguimientos/nuevo" className="btn-primary">+ Nuevo seguimiento</Link>
+        <div className="flex gap-2">
+          <ImportarSeguimientoModal escuelas={escuelas ?? []} />
+          <Link href="/seguimientos/nuevo" className="btn-primary">+ Nuevo seguimiento</Link>
+        </div>
       </div>
 
       <form className="card p-4 grid sm:grid-cols-2 lg:grid-cols-5 gap-3 items-end">

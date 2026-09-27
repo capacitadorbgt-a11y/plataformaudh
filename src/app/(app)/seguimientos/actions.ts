@@ -59,6 +59,55 @@ export async function createSeguimiento(formData: FormData) {
   redirect("/seguimientos");
 }
 
+export interface SeguimientoParaImportar {
+  escuela_id: string | null;
+  escuela_nombre_libre: string | null;
+  fecha_capacitacion: string | null;
+  cargo: string | null;
+  aspirantes: string[];
+  pdv_solicitud: string | null;
+  analista: string | null;
+  capacitador: string | null;
+  aspirante_aprobado: string | null;
+  fecha_ingreso: string | null;
+  observaciones: string | null;
+}
+
+export async function importarSeguimientos(registros: SeguimientoParaImportar[]) {
+  const { user } = await requirePermiso("seguimientos");
+  const supabase = createClient();
+
+  if (!registros.length) return { error: "No hay registros para importar", creados: 0 };
+
+  const filas = registros.map((r) => ({
+    escuela_id: r.escuela_id,
+    escuela_nombre_libre: r.escuela_id ? null : r.escuela_nombre_libre,
+    fecha_capacitacion: r.fecha_capacitacion,
+    cargo: r.cargo,
+    num_aspirantes: r.aspirantes.length || null,
+    aspirantes: r.aspirantes.map((nombre) => ({ nombre, aprobado: false })),
+    estado_proceso: "EN_PROCESO",
+    pdv_solicitud: r.pdv_solicitud,
+    analista: r.analista,
+    capacitador: r.capacitador,
+    aspirante_aprobado: r.aspirante_aprobado,
+    fecha_ingreso: r.fecha_ingreso,
+    observaciones: r.observaciones,
+    created_by: user.id,
+  }));
+
+  const { data, error } = await supabase.from("seguimientos").insert(filas).select("id");
+
+  if (error) return { error: error.message, creados: 0 };
+
+  await logAudit(user.id, "crear_seguimiento", {
+    detalle: `Importados ${data.length} seguimiento(s) desde imagen/tabla`,
+  });
+
+  revalidatePath("/seguimientos");
+  return { error: null, creados: data.length };
+}
+
 export async function updateSeguimiento(id: string, formData: FormData) {
   const { user } = await requirePermiso("seguimientos");
   const supabase = createClient();
