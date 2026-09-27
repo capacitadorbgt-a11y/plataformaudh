@@ -31,7 +31,12 @@ Devuelve EXCLUSIVAMENTE un JSON con esta forma exacta, sin texto adicional:
 
 Si el texto describe un solo proceso, devuelve un solo elemento en el arreglo. Si describe varias filas de una
 tabla (una por proceso), devuelve un elemento por fila. Usa null en cualquier campo que no puedas determinar con
-confianza; no inventes datos.`;
+confianza; no inventes datos.
+
+Extrae ÚNICAMENTE los campos listados arriba. Cualquier otro dato del texto que no corresponda a ninguno de esos
+campos (encabezados, títulos, logos, membretes, números de página, ruido del OCR, datos administrativos ajenos al
+seguimiento) se debe ignorar por completo: no lo agregues en "observaciones" ni lo fuerces en otro campo. En
+"observaciones" incluye solo comentarios reales sobre el proceso de capacitación/reclutamiento, si los hay.`;
 
 export async function POST(req: Request) {
   const apiKey = process.env.GROQ_API_KEY;
