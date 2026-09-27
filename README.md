@@ -30,6 +30,9 @@ Reemplaza el archivo `ESCUELAS DE FORMACION 2026.xlsx` que se usaba hasta ahora.
    - `supabase/migrations/0001_schema.sql` (tablas, roles, RLS)
    - `supabase/seed/0002_seed.sql` (datos migrados desde el Excel: escuelas,
      colaboradores, entregas y seguimientos)
+   - El resto de archivos en `supabase/migrations/` en orden numérico
+     (`0003_...` en adelante), incluyendo `0010_ruta_cache.sql` (caché de
+     rutas para "Escuela más cercana").
 3. En **Authentication → Users**, crea el primer usuario (tu correo y contraseña).
    Al crearse, el trigger `handle_new_user` le genera automáticamente un perfil
    con rol `analista`.
@@ -58,7 +61,11 @@ usuario admin creado en Supabase.
 1. Sube este repositorio a GitHub (ver abajo).
 2. En [vercel.com](https://vercel.com), importa el repositorio.
 3. Define las variables de entorno `NEXT_PUBLIC_SUPABASE_URL` y
-   `NEXT_PUBLIC_SUPABASE_ANON_KEY` en el proyecto de Vercel.
+   `NEXT_PUBLIC_SUPABASE_ANON_KEY` en el proyecto de Vercel. Opcionalmente
+   `GROQ_API_KEY` (UDH Bot conversacional) y `ORS_API_KEY` (rutas reales en
+   "Escuela más cercana"; gratis en
+   [openrouteservice.org](https://openrouteservice.org/dev/#/signup)) — sin
+   estas dos, ambas funciones siguen operando con su respaldo sin IA/línea recta.
 4. Despliega. Cada `git push` a la rama principal vuelve a desplegar
    automáticamente.
 

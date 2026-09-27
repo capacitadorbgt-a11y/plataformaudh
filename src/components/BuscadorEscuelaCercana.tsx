@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   coordenadasDeCiudad,
@@ -9,6 +9,13 @@ import {
   normalizarCiudad,
   SILUETA_ECUADOR,
 } from "@/lib/geoEcuador";
+
+interface ResultadoRutaApi {
+  id: string;
+  km: number;
+  min: number;
+  aproximado: boolean;
+}
 
 export interface PdvUbicado {
   nombre: string;
@@ -27,7 +34,14 @@ export interface EscuelaUbicada {
 interface Sugerencia {
   escuela: EscuelaUbicada;
   km: number | null;
+  min: number | null;
+  rutaReal: boolean;
 }
+
+// Cuantas candidatas (mas alla del top 3 final) se le mandan a /api/rutas,
+// para que si la ruta real cambia el orden dentro de un mismo grupo de
+// ciudad, el top 3 mostrado ya lo refleje.
+const CANDIDATAS_PARA_RUTA = 8;
 
 const NAVY = "#172b4c";
 const ORANGE = "#ea580c";
@@ -86,7 +100,10 @@ export default function BuscadorEscuelaCercana({
     [escuelas]
   );
 
-  const resultado = useMemo(() => {
+  const [rutasReales, setRutasReales] = useState<Record<string, ResultadoRutaApi>>({});
+  const [cargandoRutas, setCargandoRutas] = useState(false);
+
+  const candidatos = useMemo(() => {
     if (!pdvSeleccionado) return null;
 
     // Solo se sugieren escuelas habilitadas para capacitar: activas o en
@@ -100,6 +117,7 @@ export default function BuscadorEscuelaCercana({
         .filter(({ escuela }) => habilitadas(escuela.estado))
         .map(({ escuela, coords }) => ({
           escuela,
+          coords,
           km: distanciaKm(coordsPdv, coords),
           mismaCiudad: normalizarCiudad(escuela.ciudad) === ciudadPdv,
         }))
@@ -108,7 +126,7 @@ export default function BuscadorEscuelaCercana({
           if (a.mismaCiudad !== b.mismaCiudad) return a.mismaCiudad ? -1 : 1;
           return a.km - b.km;
         });
-      return { sugerencias: ordenadas.slice(0, 3) as Sugerencia[], coordsPdv, aproximado: false };
+      return { lista: ordenadas.slice(0, CANDIDATAS_PARA_RUTA), coordsPdv, sinCoordsPdv: false };
     }
 
     // Sin coordenadas para la ciudad del PDV: se ofrece como respaldo
@@ -117,9 +135,75 @@ export default function BuscadorEscuelaCercana({
     const mismaProvincia = escuelas
       .filter((e) => habilitadas(e.estado) && provincia && normalizarCiudad(e.provincia) === provincia)
       .slice(0, 3)
-      .map((escuela) => ({ escuela, km: null as number | null }));
-    return { sugerencias: mismaProvincia, coordsPdv: null, aproximado: true };
+      .map((escuela) => ({ escuela, coords: null, km: null as number | null, mismaCiudad: false }));
+    return { lista: mismaProvincia, coordsPdv: null, sinCoordsPdv: true };
   }, [pdvSeleccionado, escuelasConCoordenadas, escuelas]);
+
+  // Cada vez que cambian las candidatas con coordenadas, se piden rutas
+  // reales (o línea recta de respaldo) al endpoint /api/rutas.
+  useEffect(() => {
+    setRutasReales({});
+    if (!candidatos || candidatos.sinCoordsPdv || !candidatos.coordsPdv || candidatos.lista.length === 0) return;
+
+    let cancelado = false;
+    setCargandoRutas(true);
+    fetch("/api/rutas", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        origen: candidatos.coordsPdv,
+        origenCiudad: pdvSeleccionado?.ciudad ?? null,
+        destinos: candidatos.lista.map((c) => ({ id: c.escuela.id, lat: c.coords?.lat ?? null, lng: c.coords?.lng ?? null })),
+      }),
+    })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((datos: { resultados?: ResultadoRutaApi[] } | null) => {
+        if (cancelado || !datos?.resultados) return;
+        const mapa: Record<string, ResultadoRutaApi> = {};
+        datos.resultados.forEach((r) => (mapa[r.id] = r));
+        setRutasReales(mapa);
+      })
+      .catch(() => {
+        // Sin conexión al endpoint: se sigue mostrando el orden en línea recta.
+      })
+      .finally(() => {
+        if (!cancelado) setCargandoRutas(false);
+      });
+
+    return () => {
+      cancelado = true;
+    };
+  }, [candidatos, pdvSeleccionado?.ciudad]);
+
+  const resultado = useMemo(() => {
+    if (!candidatos) return null;
+
+    if (candidatos.sinCoordsPdv) {
+      return {
+        sugerencias: candidatos.lista.map((c) => ({ escuela: c.escuela, km: null, min: null, rutaReal: false })) as Sugerencia[],
+        coordsPdv: null,
+        sinCoordsPdv: true,
+      };
+    }
+
+    const conRutaReal = candidatos.lista
+      .map((c) => {
+        const real = rutasReales[c.escuela.id];
+        return {
+          escuela: c.escuela,
+          mismaCiudad: c.mismaCiudad,
+          km: real ? real.km : c.km,
+          min: real ? real.min : null,
+          rutaReal: !!real && !real.aproximado,
+        };
+      })
+      .sort((a, b) => {
+        if (a.mismaCiudad !== b.mismaCiudad) return a.mismaCiudad ? -1 : 1;
+        return (a.km ?? Infinity) - (b.km ?? Infinity);
+      });
+
+    return { sugerencias: conRutaReal.slice(0, 3) as Sugerencia[], coordsPdv: candidatos.coordsPdv, sinCoordsPdv: false };
+  }, [candidatos, rutasReales]);
 
   const masCercana = resultado?.sugerencias[0] ?? null;
 
@@ -184,7 +268,7 @@ export default function BuscadorEscuelaCercana({
 
           {pdvSeleccionado && resultado && (
             <div className="mt-4 space-y-3">
-              {resultado.aproximado && (
+              {resultado.sinCoordsPdv && (
                 <p className="text-xs text-amber-600">
                   No tenemos coordenadas para "{pdvSeleccionado.ciudad || "esta ciudad"}"; se sugieren escuelas de la
                   misma provincia como referencia.
@@ -196,13 +280,20 @@ export default function BuscadorEscuelaCercana({
                   href={`/escuelas/${masCercana.escuela.id}`}
                   className="block border-2 border-udh-500 bg-udh-50 rounded-xl px-4 py-3 hover:bg-udh-100"
                 >
-                  <div className="text-xs text-udh-700 font-medium uppercase tracking-wide">
+                  <div className="text-xs text-udh-700 font-medium uppercase tracking-wide flex items-center gap-1.5">
                     Escuela sugerida
+                    {!resultado.sinCoordsPdv && masCercana.km != null && (
+                      <span className={`badge text-[10px] ${masCercana.rutaReal ? "bg-udh-100 text-udh-700" : "bg-neutral-100 text-neutral-500"}`}>
+                        {cargandoRutas && !masCercana.rutaReal ? "calculando ruta…" : masCercana.rutaReal ? "ruta real" : "aprox. en línea recta"}
+                      </span>
+                    )}
                   </div>
                   <div className="font-semibold text-neutral-800">{masCercana.escuela.nombre}</div>
                   <div className="text-xs text-neutral-500">
                     {masCercana.escuela.ciudad ?? "—"}
-                    {masCercana.km != null && ` · ~${Math.round(masCercana.km)} km del PDV`}
+                    {masCercana.km != null && ` · ~${Math.round(masCercana.km)} km`}
+                    {masCercana.min != null && ` · ~${Math.round(masCercana.min)} min`}
+                    {masCercana.km != null && " del PDV"}
                   </div>
                 </Link>
               ) : (
@@ -214,7 +305,7 @@ export default function BuscadorEscuelaCercana({
               {resultado.sugerencias.length > 1 && (
                 <div className="space-y-1.5">
                   <div className="text-xs text-neutral-400">Otras opciones:</div>
-                  {resultado.sugerencias.slice(1).map(({ escuela, km }) => (
+                  {resultado.sugerencias.slice(1).map(({ escuela, km, min }) => (
                     <Link
                       key={escuela.id}
                       href={`/escuelas/${escuela.id}`}
@@ -222,7 +313,7 @@ export default function BuscadorEscuelaCercana({
                     >
                       <span>{escuela.nombre}</span>
                       <span className="text-xs text-neutral-400 shrink-0 ml-2">
-                        {km != null ? `~${Math.round(km)} km` : escuela.ciudad}
+                        {km != null ? `~${Math.round(km)} km${min != null ? ` · ~${Math.round(min)} min` : ""}` : escuela.ciudad}
                       </span>
                     </Link>
                   ))}
