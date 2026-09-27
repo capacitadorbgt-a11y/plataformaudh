@@ -6,20 +6,11 @@ import type { Profile } from "@/types/database";
 
 export const runtime = "nodejs";
 
-// TEMP-DIAGNOSTICO: lista los modelos que esta cuenta de Groq puede usar
-// (se quita despues de confirmar el nombre correcto del modelo).
-export async function GET() {
-  const apiKey = process.env.GROQ_API_KEY;
-  if (!apiKey) return NextResponse.json({ error: "sin key" }, { status: 501 });
-  const r = await fetch("https://api.groq.com/openai/v1/models", {
-    headers: { Authorization: `Bearer ${apiKey}` },
-  });
-  const datos = await r.json();
-  return NextResponse.json(datos, { status: r.status });
-}
-
 const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
-const MODELO = "llama-3.3-70b-versatile";
+// El plan de Groq configurado no tiene acceso a los modelos Llama de chat;
+// gpt-oss-120b (open-weight de OpenAI, alojado en Groq) si esta disponible
+// y soporta "tools", que es lo que necesita este asistente.
+const MODELO = "openai/gpt-oss-120b";
 
 const SYSTEM_PROMPT = `Eres UDH Bot, el asistente de la Plataforma UDH (Universidad del Helado), el sistema interno
 que usa Bogati Helados con Queso para gestionar sus escuelas de formación de personal a nivel nacional en Ecuador.
