@@ -6,6 +6,18 @@ import type { Profile } from "@/types/database";
 
 export const runtime = "nodejs";
 
+// TEMP-DIAGNOSTICO: lista los modelos que esta cuenta de Groq puede usar
+// (se quita despues de confirmar el nombre correcto del modelo).
+export async function GET() {
+  const apiKey = process.env.GROQ_API_KEY;
+  if (!apiKey) return NextResponse.json({ error: "sin key" }, { status: 501 });
+  const r = await fetch("https://api.groq.com/openai/v1/models", {
+    headers: { Authorization: `Bearer ${apiKey}` },
+  });
+  const datos = await r.json();
+  return NextResponse.json(datos, { status: r.status });
+}
+
 const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
 const MODELO = "llama-3.3-70b-versatile";
 
