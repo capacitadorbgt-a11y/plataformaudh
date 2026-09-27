@@ -1,6 +1,6 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
-import { distanciaKm, normalizarCiudad } from "@/lib/geoEcuador";
+import { normalizarCiudad } from "@/lib/geoEcuador";
 import { obtenerProveedorRuteo, proveedorLineaRecta } from "@/lib/routing/index";
 import type { GeometriaRuta, PuntoRuta } from "@/lib/routing/tipos";
 
@@ -62,8 +62,14 @@ export async function resolverRutasParaDestinos(
     filas?.forEach((f) => cacheVigente.set(f.escuela_id, f));
   }
 
+  // Estimación en línea recta (siempre disponible, sin red): sirve para
+  // preseleccionar candidatas y como valor real cuando no hay ORS_API_KEY o
+  // la llamada a ORS falla. Antes esto se calculaba solo en km y el tiempo
+  // quedaba fijo en 0, lo que hacía que el componente "tiempo" del score de
+  // recomendación no distinguiera una escuela a 10 km de una a 200 km.
+  const estimacionesRecta = await proveedorLineaRecta.calcularMatriz(origen, validos);
   const conDistanciaRecta = validos
-    .map((d) => ({ destino: d, kmRecta: distanciaKm(origen, d) }))
+    .map((d, i) => ({ destino: d, kmRecta: estimacionesRecta[i].km, minRecta: estimacionesRecta[i].min }))
     .sort((a, b) => a.kmRecta - b.kmRecta);
 
   const proveedor = obtenerProveedorRuteo();
@@ -88,18 +94,18 @@ export async function resolverRutasParaDestinos(
         : [];
       preseleccionadas.forEach((p, i) => {
         const km = matriz[i]?.km ?? p.kmRecta;
-        const min = matriz[i]?.min ?? 0;
+        const min = matriz[i]?.min ?? p.minRecta;
         resultados.push({ id: p.destino.id, km, min, aproximado: false });
         if (ciudadNormalizada) {
           filasParaGuardar.push({ pdv_ciudad: ciudadNormalizada, escuela_id: p.destino.id, km, min, geometria: null, calculado_en: new Date().toISOString() });
         }
       });
-      resultados.push(...resto.map((p) => ({ id: p.destino.id, km: p.kmRecta, min: 0, aproximado: true })));
+      resultados.push(...resto.map((p) => ({ id: p.destino.id, km: p.kmRecta, min: p.minRecta, aproximado: true })));
     } catch {
-      resultados.push(...pendientes.map((p) => ({ id: p.destino.id, km: p.kmRecta, min: 0, aproximado: true })));
+      resultados.push(...pendientes.map((p) => ({ id: p.destino.id, km: p.kmRecta, min: p.minRecta, aproximado: true })));
     }
   } else {
-    resultados.push(...conDistanciaRecta.map((p) => ({ id: p.destino.id, km: p.kmRecta, min: 0, aproximado: true })));
+    resultados.push(...conDistanciaRecta.map((p) => ({ id: p.destino.id, km: p.kmRecta, min: p.minRecta, aproximado: true })));
   }
 
   if (filasParaGuardar.length > 0) {
