@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { requirePermiso } from "@/lib/auth";
+import { analistaPorEmail, capacitadorPorEmail } from "@/lib/mapeoUsuarioSeguimiento";
 import { createSeguimiento } from "../actions";
 import type { Escuela } from "@/types/database";
 
@@ -8,8 +9,10 @@ export default async function NuevoSeguimientoPage({
 }: {
   searchParams: { error?: string };
 }) {
-  await requirePermiso("seguimientos");
+  const { user } = await requirePermiso("seguimientos");
   const supabase = createClient();
+  const analistaSugerido = analistaPorEmail(user.email);
+  const capacitadorSugerido = capacitadorPorEmail(user.email);
 
   const [{ data: escuelas }, { data: pdvs }] = await Promise.all([
     supabase
@@ -71,11 +74,11 @@ export default async function NuevoSeguimientoPage({
         <div className="grid sm:grid-cols-2 gap-4">
           <div>
             <label className="label">Analista</label>
-            <input className="input" name="analista" />
+            <input className="input" name="analista" defaultValue={analistaSugerido ?? ""} />
           </div>
           <div>
             <label className="label">Capacitador</label>
-            <input className="input" name="capacitador" />
+            <input className="input" name="capacitador" defaultValue={capacitadorSugerido ?? ""} />
           </div>
         </div>
 

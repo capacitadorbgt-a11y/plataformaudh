@@ -12,12 +12,23 @@ import {
   textoPlanoATabla,
   type SeguimientoImportado,
 } from "@/lib/importarSeguimientosDatos";
+import { analistaPorEmail, capacitadorPorEmail } from "@/lib/mapeoUsuarioSeguimiento";
 
 interface FilaEditable extends SeguimientoImportado {
   escuelaId: string | null;
 }
 
-export default function ImportarSeguimientoModal({ escuelas }: { escuelas: { id: string; nombre: string }[] }) {
+export default function ImportarSeguimientoModal({
+  escuelas,
+  emailUsuario,
+}: {
+  escuelas: { id: string; nombre: string }[];
+  emailUsuario: string | null;
+}) {
+  // El analista y el capacitador de un seguimiento importado son quien hace
+  // la importación, no un dato a adivinar de la imagen/tabla.
+  const analistaSesion = analistaPorEmail(emailUsuario);
+  const capacitadorSesion = capacitadorPorEmail(emailUsuario);
   const [abierto, setAbierto] = useState(false);
   const [procesando, setProcesando] = useState(false);
   const [progreso, setProgreso] = useState("");
@@ -48,6 +59,8 @@ export default function ImportarSeguimientoModal({ escuelas }: { escuelas: { id:
     return extraidos.map((f) => ({
       ...f,
       escuelaId: coincidenciaMasCercana(f.escuelaTexto, escuelas),
+      analista: analistaSesion ?? f.analista,
+      capacitador: capacitadorSesion ?? f.capacitador,
     }));
   }
 

@@ -21,7 +21,7 @@ export default async function SeguimientosPage({
 }: {
   searchParams: SeguimientosSearchParams;
 }) {
-  await requirePermiso("seguimientos");
+  const { user } = await requirePermiso("seguimientos");
   const supabase = createClient();
 
   const { data: escuelas } = await supabase
@@ -83,7 +83,7 @@ export default async function SeguimientosPage({
           <p className="text-sm text-neutral-500">{seguimientos?.length ?? 0} registros</p>
         </div>
         <div className="flex gap-2">
-          <ImportarSeguimientoModal escuelas={escuelas ?? []} />
+          <ImportarSeguimientoModal escuelas={escuelas ?? []} emailUsuario={user.email ?? null} />
           <Link href="/seguimientos/nuevo" className="btn-primary">+ Nuevo seguimiento</Link>
         </div>
       </div>
