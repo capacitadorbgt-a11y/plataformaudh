@@ -1,9 +1,10 @@
 import { createClient } from "@/lib/supabase/server";
 import { requirePermiso } from "@/lib/auth";
 import Link from "next/link";
-import type { Escuela, Seguimiento } from "@/types/database";
+import type { Escuela, Informe, Seguimiento } from "@/types/database";
 import SeguimientosTable from "@/components/SeguimientosTable";
 import ImportarSeguimientoModal from "@/components/ImportarSeguimientoModal";
+import type { InformeSeguimientoItem } from "@/components/SeguimientoInformeButton";
 
 interface SeguimientosSearchParams {
   escuela_id?: string;
@@ -21,7 +22,7 @@ export default async function SeguimientosPage({
 }: {
   searchParams: SeguimientosSearchParams;
 }) {
-  const { user } = await requirePermiso("seguimientos");
+  const { user, profile } = await requirePermiso("seguimientos");
   const supabase = createClient();
 
   const { data: escuelas } = await supabase
@@ -64,6 +65,31 @@ export default async function SeguimientosPage({
   const { data: seguimientos } = await query.returns<
     (Seguimiento & { escuelas: { nombre: string } | null })[]
   >();
+
+  const idsSeguimientos = (seguimientos ?? []).map((s) => s.id);
+  const { data: informes } = idsSeguimientos.length
+    ? await supabase
+        .from("informes")
+        .select("*")
+        .in("seguimiento_id", idsSeguimientos)
+        .order("created_at", { ascending: false })
+        .returns<Informe[]>()
+    : { data: [] as Informe[] };
+
+  const informesPorSeguimiento: Record<string, InformeSeguimientoItem[]> = {};
+  for (const inf of informes ?? []) {
+    if (!inf.seguimiento_id) continue;
+    const { data } = await supabase.storage.from("informes").createSignedUrl(inf.storage_path, 3600);
+    const item: InformeSeguimientoItem = {
+      id: inf.id,
+      nombre_archivo: inf.nombre_archivo,
+      tamano_bytes: inf.tamano_bytes,
+      created_at: inf.created_at,
+      storage_path: inf.storage_path,
+      url: data?.signedUrl ?? null,
+    };
+    (informesPorSeguimiento[inf.seguimiento_id] ??= []).push(item);
+  }
 
   const hayFiltros =
     searchParams.escuela_id ||
@@ -138,7 +164,12 @@ export default async function SeguimientosPage({
         </div>
       </form>
 
-      <SeguimientosTable seguimientos={seguimientos ?? []} />
+      <SeguimientosTable
+        seguimientos={seguimientos ?? []}
+        informesPorSeguimiento={informesPorSeguimiento}
+        creadoPor={profile.id}
+        puedeEliminarInformes={profile.role === "admin_udh"}
+      />
     </div>
   );
 }

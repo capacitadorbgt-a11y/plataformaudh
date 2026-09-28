@@ -1,7 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
-import { requirePermiso } from "@/lib/auth";
+import { requireAdmin, requirePermiso } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -106,6 +106,17 @@ export async function importarSeguimientos(registros: SeguimientoParaImportar[])
 
   revalidatePath("/seguimientos");
   return { error: null, creados: data.length };
+}
+
+export async function deleteInformeSeguimiento(seguimientoId: string, informeId: string, storagePath: string) {
+  const { user } = await requireAdmin();
+  const supabase = createClient();
+
+  await supabase.storage.from("informes").remove([storagePath]);
+  await supabase.from("informes").delete().eq("id", informeId);
+
+  await logAudit(user.id, "eliminar_informe", { entidad: "seguimiento", entidadId: seguimientoId });
+  revalidatePath("/seguimientos");
 }
 
 export async function updateSeguimiento(id: string, formData: FormData) {

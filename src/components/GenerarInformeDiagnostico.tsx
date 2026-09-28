@@ -32,7 +32,7 @@ export default function GenerarInformeDiagnostico({ escuela, creadoPor }: { escu
 
           const supabase = createClient();
           const pdfFile = new File([blob], nombreArchivo, { type: "application/pdf" });
-          const resultadoSubida = await subirInformeCliente(supabase, escuela.id, pdfFile, creadoPor);
+          const resultadoSubida = await subirInformeCliente(supabase, { escuelaId: escuela.id }, pdfFile, creadoPor);
           if (resultadoSubida.error) return resultadoSubida;
 
           if (datos.aptitud) {

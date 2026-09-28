@@ -26,7 +26,7 @@ export default function AgregarInformeButton({ escuelaId, creadoPor }: { escuela
     run(
       async () => {
         const supabase = createClient();
-        const resultadoSubida = await subirInformeCliente(supabase, escuelaId, archivo, creadoPor);
+        const resultadoSubida = await subirInformeCliente(supabase, { escuelaId }, archivo, creadoPor);
         if (resultadoSubida.error) return resultadoSubida;
 
         if (aptitud) {

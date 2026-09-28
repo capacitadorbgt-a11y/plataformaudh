@@ -58,7 +58,8 @@ export interface Colaborador {
 
 export interface Informe {
   id: string;
-  escuela_id: string;
+  escuela_id: string | null;
+  seguimiento_id: string | null;
   nombre_archivo: string;
   tipo_archivo: string | null;
   storage_path: string;

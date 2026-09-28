@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Seguimiento } from "@/types/database";
 import { exportarCSV, exportarXLS, exportarPDF } from "@/lib/exportSeguimientos";
+import SeguimientoInformeButton, { type InformeSeguimientoItem } from "@/components/SeguimientoInformeButton";
 
 type SeguimientoRow = Seguimiento & { escuelas: { nombre: string } | null };
 
@@ -18,8 +19,14 @@ function EstadoProcesoBadge({ estado }: { estado: string }) {
 
 export default function SeguimientosTable({
   seguimientos,
+  informesPorSeguimiento,
+  creadoPor,
+  puedeEliminarInformes,
 }: {
   seguimientos: SeguimientoRow[];
+  informesPorSeguimiento: Record<string, InformeSeguimientoItem[]>;
+  creadoPor: string;
+  puedeEliminarInformes: boolean;
 }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [menuAbierto, setMenuAbierto] = useState(false);
@@ -95,6 +102,7 @@ export default function SeguimientosTable({
               <th className="px-4 py-3 font-medium">Aprobado</th>
               <th className="px-4 py-3 font-medium">PDV solicitud</th>
               <th className="px-4 py-3 font-medium">Capacitador</th>
+              <th className="px-4 py-3 font-medium">Informe</th>
             </tr>
           </thead>
           <tbody>
@@ -125,11 +133,19 @@ export default function SeguimientosTable({
                 <td className="px-4 py-3 text-neutral-600">{s.aspirante_aprobado ?? "—"}</td>
                 <td className="px-4 py-3 text-neutral-600">{s.pdv_solicitud ?? "—"}</td>
                 <td className="px-4 py-3 text-neutral-600">{s.capacitador ?? "—"}</td>
+                <td className="px-4 py-3">
+                  <SeguimientoInformeButton
+                    seguimientoId={s.id}
+                    informes={informesPorSeguimiento[s.id] ?? []}
+                    creadoPor={creadoPor}
+                    puedeEliminar={puedeEliminarInformes}
+                  />
+                </td>
               </tr>
             ))}
             {seguimientos.length === 0 && (
               <tr>
-                <td colSpan={9} className="px-4 py-8 text-center text-neutral-400">
+                <td colSpan={10} className="px-4 py-8 text-center text-neutral-400">
                   No se encontraron seguimientos con esos filtros.
                 </td>
               </tr>

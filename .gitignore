@@ -21,3 +21,7 @@ npm-debug.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# tesseract.js cachea aqui el modelo entrenado si se corre OCR desde Node
+# (scripts de prueba manuales); en el navegador lo trae de su propio CDN.
+*.traineddata
