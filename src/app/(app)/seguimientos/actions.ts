@@ -119,6 +119,24 @@ export async function deleteInformeSeguimiento(seguimientoId: string, informeId:
   revalidatePath("/seguimientos");
 }
 
+export async function deleteSeguimiento(id: string) {
+  const { user } = await requireAdmin();
+  const supabase = createClient();
+
+  // Los informes ligados a este seguimiento se borran en cascada a nivel de
+  // fila (FK on delete cascade), pero los archivos en Storage no se limpian
+  // solos: hay que borrarlos aparte para no dejar huérfanos en el bucket.
+  const { data: informes } = await supabase.from("informes").select("storage_path").eq("seguimiento_id", id);
+  if (informes && informes.length > 0) {
+    await supabase.storage.from("informes").remove(informes.map((i) => i.storage_path));
+  }
+
+  await supabase.from("seguimientos").delete().eq("id", id);
+
+  await logAudit(user.id, "eliminar_seguimiento", { entidad: "seguimiento", entidadId: id });
+  revalidatePath("/seguimientos");
+}
+
 export async function updateSeguimiento(id: string, formData: FormData) {
   const { user } = await requirePermiso("seguimientos");
   const supabase = createClient();

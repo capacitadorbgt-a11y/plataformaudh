@@ -168,7 +168,7 @@ export default async function SeguimientosPage({
         seguimientos={seguimientos ?? []}
         informesPorSeguimiento={informesPorSeguimiento}
         creadoPor={profile.id}
-        puedeEliminarInformes={profile.role === "admin_udh"}
+        esAdmin={profile.role === "admin_udh"}
       />
     </div>
   );

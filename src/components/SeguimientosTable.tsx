@@ -1,9 +1,10 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { Seguimiento } from "@/types/database";
 import { exportarCSV, exportarXLS, exportarPDF } from "@/lib/exportSeguimientos";
+import { deleteSeguimiento } from "@/app/(app)/seguimientos/actions";
 import SeguimientoInformeButton, { type InformeSeguimientoItem } from "@/components/SeguimientoInformeButton";
 
 type SeguimientoRow = Seguimiento & { escuelas: { nombre: string } | null };
@@ -21,18 +22,32 @@ export default function SeguimientosTable({
   seguimientos,
   informesPorSeguimiento,
   creadoPor,
-  puedeEliminarInformes,
+  esAdmin,
 }: {
   seguimientos: SeguimientoRow[];
   informesPorSeguimiento: Record<string, InformeSeguimientoItem[]>;
   creadoPor: string;
-  puedeEliminarInformes: boolean;
+  esAdmin: boolean;
 }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [menuAbierto, setMenuAbierto] = useState(false);
   const [exportando, setExportando] = useState(false);
+  const [isDeleting, startDeleteTransition] = useTransition();
   const menuRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
+
+  const seguimientoSeleccionado = seguimientos.find((s) => s.id === selectedId) ?? null;
+
+  function handleEliminar() {
+    if (!seguimientoSeleccionado) return;
+    const nombre = seguimientoSeleccionado.escuelas?.nombre ?? seguimientoSeleccionado.escuela_nombre_libre ?? "este registro";
+    const fecha = seguimientoSeleccionado.fecha_capacitacion ? ` (${seguimientoSeleccionado.fecha_capacitacion})` : "";
+    if (!confirm(`¿Eliminar el seguimiento de ${nombre}${fecha}? Esta acción no se puede deshacer.`)) return;
+    startDeleteTransition(async () => {
+      await deleteSeguimiento(seguimientoSeleccionado.id);
+      setSelectedId(null);
+    });
+  }
 
   async function handleExportar(formato: "csv" | "xls" | "pdf") {
     setMenuAbierto(false);
@@ -87,6 +102,16 @@ export default function SeguimientosTable({
         >
           Editar
         </button>
+        {esAdmin && (
+          <button
+            type="button"
+            disabled={!selectedId || isDeleting}
+            onClick={handleEliminar}
+            className="btn-secondary text-red-600 disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            {isDeleting ? "Eliminando..." : "Eliminar"}
+          </button>
+        )}
       </div>
 
       <div className="card overflow-x-auto">
@@ -138,7 +163,7 @@ export default function SeguimientosTable({
                     seguimientoId={s.id}
                     informes={informesPorSeguimiento[s.id] ?? []}
                     creadoPor={creadoPor}
-                    puedeEliminar={puedeEliminarInformes}
+                    puedeEliminar={esAdmin}
                   />
                 </td>
               </tr>
