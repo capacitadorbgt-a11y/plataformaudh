@@ -66,9 +66,14 @@ export default function ImportarSeguimientoModal({
 
   async function procesarImagen(archivo: Blob) {
     setProgreso("Leyendo texto de la imagen (OCR)...");
-    const { createWorker } = await import("tesseract.js");
+    const { createWorker, PSM } = await import("tesseract.js");
     const worker = await createWorker("spa");
     try {
+      // El modo automático (PSM 3, por defecto) destroza capturas de correo
+      // con una tabla + firma: confirmado con una imagen real donde el texto
+      // salía irreconocible. SINGLE_COLUMN lee mucho mejor este tipo de
+      // captura con tabla angosta + texto suelto.
+      await worker.setParameters({ tessedit_pageseg_mode: PSM.SINGLE_COLUMN });
       const {
         data: { text },
       } = await worker.recognize(archivo);
